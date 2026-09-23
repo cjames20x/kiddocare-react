@@ -30,7 +30,7 @@ img { max-width: 100%; display: block; }
 .nav-links { display: flex; gap: 48px; }
 .nav-links a { color: var(--white); font-weight: 700; font-size: 15px; letter-spacing: 0.5px; }
 .nav-links a.active { color: var(--pink); }
-.nav-actions { display: flex; gap: 10px; }
+.nav-actions { display: flex; align-items: center; gap: 10px; }
 .btn-outline {
   background: transparent;
   border: 0.5px solid rgba(255,182,193,0.8);

@@ -5,6 +5,7 @@ import {
   CreditCard, FileText, ThumbsUp, HelpCircle, Bell, Search, Plus, Users, Calendar,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
+import NotificationBar from '../components/NotificationBar.jsx'
 
 function calcAge(dob) {
   if (!dob) return '—'
@@ -30,6 +31,7 @@ export default function Dashboard() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [showConfirm, setShowConfirm] = useState(false)
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
 
   const children = user?.patientName
     ? [{
@@ -69,10 +71,16 @@ export default function Dashboard() {
       <main className="dash-main">
         <div className="dash-topbar">
           <h1 className="dash-title">DASHBOARD</h1>
-          <div className="dash-bell">
+          <button
+            type="button"
+            className="dash-bell"
+            onClick={() => setIsNotificationsOpen(true)}
+            aria-label="Open notifications"
+            title="Notifications"
+          >
             <Bell size={20} />
-            <span className="dash-bell-dot"></span>
-          </div>
+            <span className="dash-bell-dot">6</span>
+          </button>
         </div>
 
         <div className="dash-cards">
@@ -127,6 +135,8 @@ export default function Dashboard() {
           </table>
         </div>
       </main>
+
+      <NotificationBar isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} />
 
       {showConfirm && (
         <div className="confirm-overlay" onClick={() => setShowConfirm(false)}>
