@@ -241,44 +241,46 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Quick Stat Cards */}
-        <div className="dash-cards">
-          <div
-            className="dash-card"
-            style={{ cursor: 'pointer' }}
-            onClick={() => setActiveTab('Child Information')}
-          >
-            <div>
-              <div className="num">{children.length}</div>
-              <div>Children</div>
+        {/* Quick Stat Cards (Hidden on Book Appointments) */}
+        {activeTab !== 'Book Appointments' && (
+          <div className="dash-cards">
+            <div
+              className="dash-card"
+              style={{ cursor: 'pointer' }}
+              onClick={() => setActiveTab('Child Information')}
+            >
+              <div>
+                <div className="num">{children.length}</div>
+                <div>Children</div>
+              </div>
+              <User size={44} className="dash-card-icon" />
             </div>
-            <User size={44} className="dash-card-icon" />
-          </div>
 
-          <div
-            className="dash-card"
-            style={{ cursor: 'pointer' }}
-            onClick={() => setActiveTab('Appointments')}
-          >
-            <div>
-              <div className="num">{appointments.length}</div>
-              <div>Upcoming Appointment{appointments.length === 1 ? '' : 's'}</div>
+            <div
+              className="dash-card"
+              style={{ cursor: 'pointer' }}
+              onClick={() => setActiveTab('Appointments')}
+            >
+              <div>
+                <div className="num">{appointments.length}</div>
+                <div>Upcoming Appointment{appointments.length === 1 ? '' : 's'}</div>
+              </div>
+              <Calendar size={44} className="dash-card-icon" />
             </div>
-            <Calendar size={44} className="dash-card-icon" />
-          </div>
 
-          <div
-            className="dash-card"
-            style={{ cursor: 'pointer' }}
-            onClick={() => setActiveTab('Payments')}
-          >
-            <div>
-              <div className="num">2</div>
-              <div>Pending Payments</div>
+            <div
+              className="dash-card"
+              style={{ cursor: 'pointer' }}
+              onClick={() => setActiveTab('Payments')}
+            >
+              <div>
+                <div className="num">2</div>
+                <div>Pending Payments</div>
+              </div>
+              <CreditCard size={44} className="dash-card-icon" />
             </div>
-            <CreditCard size={44} className="dash-card-icon" />
           </div>
-        </div>
+        )}
 
         {/* ========================================================= */}
         {/* TAB: DASHBOARD & TAB: CHILD INFORMATION */}
@@ -473,7 +475,13 @@ export default function Dashboard() {
         {/* TAB: BOOK APPOINTMENTS */}
         {/* ========================================================= */}
         {activeTab === 'Book Appointments' && (
-          <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            minHeight: 'calc(100vh - 220px)',
+            padding: '20px 0'
+          }}>
             <div className="appointment-card" style={{ width: '100%', maxWidth: '640px' }}>
               <div className="appointment-header">
                 <h2>Book an <span>Appointment</span></h2>
