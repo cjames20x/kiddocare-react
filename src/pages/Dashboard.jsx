@@ -1,10 +1,6 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import {
-  Home, User, ClipboardCheck, Baby, ClipboardList, Syringe,
-  CreditCard, FileText, ThumbsUp, HelpCircle, Bell, Search, Plus, Users, Calendar,
-} from 'lucide-react'
+import { Bell, Search, Plus, Users, Calendar, User, CreditCard } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
+import DashboardSidebar from '../components/DashboardSidebar.jsx'
 
 function calcAge(dob) {
   if (!dob) return '—'
@@ -13,23 +9,8 @@ function calcAge(dob) {
   return `${years} year${years === 1 ? '' : 's'}`
 }
 
-const NAV_ITEMS = [
-  { icon: Home, label: 'Dashboard' },
-  { icon: User, label: 'Child Information' },
-  { icon: ClipboardCheck, label: 'Book Appointments' },
-  { icon: Baby, label: 'Register Child' },
-  { icon: ClipboardList, label: 'Appointments' },
-  { icon: Syringe, label: 'Vaccinations' },
-  { icon: CreditCard, label: 'Payments' },
-  { icon: FileText, label: 'Documents' },
-  { icon: ThumbsUp, label: 'Feedback' },
-  { icon: HelpCircle, label: 'Help' },
-]
-
 export default function Dashboard() {
-  const { user, logout } = useAuth()
-  const navigate = useNavigate()
-  const [showConfirm, setShowConfirm] = useState(false)
+  const { user } = useAuth()
 
   const children = user?.patientName
     ? [{
@@ -42,29 +23,9 @@ export default function Dashboard() {
       }]
     : []
 
-  function confirmLogout() {
-    logout()
-    navigate('/')
-  }
-
   return (
     <div className="dash-layout">
-      <aside className="dash-sidebar">
-        <div className="dash-logo">
-          <img src="/images/kiddocare-logo.png" alt="KiddoCare" />
-        </div>
-        <nav className="dash-nav">
-          {NAV_ITEMS.map(({ icon: Icon, label }, i) => (
-            <div key={label} className={`dash-nav-item${i === 0 ? ' active' : ''}`}>
-              <Icon size={20} />
-              <span>{label}</span>
-            </div>
-          ))}
-        </nav>
-        <div className="dash-logout-wrap">
-          <button className="dash-logout-btn" onClick={() => setShowConfirm(true)}>Logout</button>
-        </div>
-      </aside>
+      <DashboardSidebar active="Dashboard" />
 
       <main className="dash-main">
         <div className="dash-topbar">
@@ -127,18 +88,6 @@ export default function Dashboard() {
           </table>
         </div>
       </main>
-
-      {showConfirm && (
-        <div className="confirm-overlay" onClick={() => setShowConfirm(false)}>
-          <div className="confirm-box" onClick={(e) => e.stopPropagation()}>
-            <p>Are you sure you want to log out?</p>
-            <div className="confirm-actions">
-              <button className="btn-secondary" onClick={() => setShowConfirm(false)}>Cancel</button>
-              <button className="btn-primary" onClick={confirmLogout}>Yes</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
