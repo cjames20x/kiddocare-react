@@ -340,11 +340,11 @@ export default function UserDashboard() {
               Child Registration Form
             </h3>
 
-            <form className="appointment-form" onSubmit={handleRegisterSubmit} style={{ padding: '20px 0' }}>
-              <div className="form-row">
-                <div className="form-group">
+            <form className="dash-appointment-form" onSubmit={handleRegisterSubmit} style={{ padding: '20px 0' }}>
+              <div className="dash-form-row">
+                <div className="dash-form-group">
                   <label>
-                    Child's Full Name <span className="required">*</span>
+                    Child's Full Name <span className="dash-required">*</span>
                   </label>
                   <input
                     type="text"
@@ -354,9 +354,9 @@ export default function UserDashboard() {
                     required
                   />
                 </div>
-                <div className="form-group">
+                <div className="dash-form-group">
                   <label>
-                    Date of Birth <span className="required">*</span>
+                    Date of Birth <span className="dash-required">*</span>
                   </label>
                   <input
                     type="date"
@@ -367,8 +367,8 @@ export default function UserDashboard() {
                 </div>
               </div>
 
-              <div className="form-row">
-                <div className="form-group">
+              <div className="dash-form-row">
+                <div className="dash-form-group">
                   <label>Gender</label>
                   <select
                     value={registerForm.gender}
@@ -379,9 +379,9 @@ export default function UserDashboard() {
                     <option value="Other">Other</option>
                   </select>
                 </div>
-                <div className="form-group">
+                <div className="dash-form-group">
                   <label>
-                    Parent/Guardian Full Name <span className="required">*</span>
+                    Parent/Guardian Full Name <span className="dash-required">*</span>
                   </label>
                   <input
                     type="text"
@@ -393,8 +393,8 @@ export default function UserDashboard() {
                 </div>
               </div>
 
-              <div className="form-row">
-                <div className="form-group">
+              <div className="dash-form-row">
+                <div className="dash-form-group">
                   <label>Guardian Contact Phone</label>
                   <input
                     type="tel"
@@ -403,7 +403,7 @@ export default function UserDashboard() {
                     onChange={(e) => setRegisterForm({ ...registerForm, phone: e.target.value })}
                   />
                 </div>
-                <div className="form-group">
+                <div className="dash-form-group">
                   <label>Known Allergies / Medical Notes</label>
                   <input
                     type="text"
@@ -414,7 +414,7 @@ export default function UserDashboard() {
                 </div>
               </div>
 
-              <button type="submit" className="btn-book">
+              <button type="submit" className="dash-btn-book">
                 Save & Register Child
               </button>
             </form>
@@ -426,15 +426,32 @@ export default function UserDashboard() {
         {/* ========================================================= */}
         {activeTab === 'book' && (
           <div style={{ display: 'flex', justifyContent: 'center' }}>
-            <div className="appointment-card" style={{ width: '100%', maxWidth: '680px' }}>
-              <div className="appointment-header">
-                <h2>Book an <span>Appointment</span></h2>
+            <div className="dash-appointment-card" style={{ width: '100%', maxWidth: '920px' }}>
+              <div className="dash-appointment-info">
+                <span className="dash-appointment-eyebrow">Pediatric care, on your schedule</span>
+                <h2>Book an appointment</h2>
+                <p>Tell us what your child needs and we'll match you with the right visit — usually confirmed the same day.</p>
+                <ul className="dash-appointment-perks">
+                  <li>
+                    <svg width="18" height="18" viewBox="0 0 20 20"><path d="M4 10.5l4 4 8-9" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                    Open slots within this week
+                  </li>
+                  <li>
+                    <svg width="18" height="18" viewBox="0 0 20 20"><path d="M4 10.5l4 4 8-9" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                    Licensed pediatricians only
+                  </li>
+                  <li>
+                    <svg width="18" height="18" viewBox="0 0 20 20"><path d="M4 10.5l4 4 8-9" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                    Records saved to your account
+                  </li>
+                </ul>
               </div>
 
-              <form className="appointment-form" onSubmit={handleBookingSubmit}>
-                <div className="form-group">
+              <div className="dash-appointment-main">
+              <form className="dash-appointment-form" onSubmit={handleBookingSubmit}>
+                <div className="dash-form-group">
                   <label>
-                    Select Child <span className="required">*</span>
+                    Select Child <span className="dash-required">*</span>
                   </label>
                   <select
                     value={bookForm.childId}
@@ -450,10 +467,10 @@ export default function UserDashboard() {
                   </select>
                 </div>
 
-                <div className="form-row">
-                  <div className="form-group">
+                <div className="dash-form-row">
+                  <div className="dash-form-group">
                     <label>
-                      Service Required <span className="required">*</span>
+                      Service Required <span className="dash-required">*</span>
                     </label>
                     <select
                       value={bookForm.service}
@@ -467,9 +484,9 @@ export default function UserDashboard() {
                     </select>
                   </div>
 
-                  <div className="form-group">
+                  <div className="dash-form-group">
                     <label>
-                      Preferred Date <span className="required">*</span>
+                      Preferred Date <span className="dash-required">*</span>
                     </label>
                     <input
                       type="date"
@@ -480,8 +497,8 @@ export default function UserDashboard() {
                   </div>
                 </div>
 
-                <div className="form-row">
-                  <div className="form-group">
+                <div className="dash-form-row">
+                  <div className="dash-form-group">
                     <label>Time Slot</label>
                     <select
                       value={bookForm.timeSlot}
@@ -493,7 +510,7 @@ export default function UserDashboard() {
                       <option value="03:00 PM">03:00 PM - 04:00 PM</option>
                     </select>
                   </div>
-                  <div className="form-group">
+                  <div className="dash-form-group">
                     <label>Additional Notes</label>
                     <input
                       type="text"
@@ -504,10 +521,11 @@ export default function UserDashboard() {
                   </div>
                 </div>
 
-                <button type="submit" className="btn-book">
+                <button type="submit" className="dash-btn-book">
                   Confirm Appointment
                 </button>
               </form>
+              </div>
             </div>
           </div>
         )}

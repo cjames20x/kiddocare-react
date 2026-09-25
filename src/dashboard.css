@@ -260,3 +260,107 @@
 .help-acc-item.open .help-acc-body { max-height: 400px; }
 .help-steps { padding: 4px 18px 18px 34px; }
 .help-steps li { font-size: 13px; color: var(--gray-73); margin-bottom: 8px; line-height: 1.5; }
+
+/* ===== Appointment / Register Child forms (dashboard-scoped) ===== */
+.dash-appointment-card {
+  background: var(--white);
+  border-radius: 14px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  display: flex;
+  align-items: stretch;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Left info panel (Book Appointment tab) */
+.dash-appointment-info {
+  position: relative;
+  flex: 0 0 38%;
+  background: linear-gradient(165deg, #3d6bb0, var(--blue-dark));
+  color: var(--white);
+  padding: 44px 36px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 18px;
+  overflow: hidden;
+}
+.dash-appointment-info::before {
+  content: "";
+  position: absolute;
+  width: 260px; height: 260px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.07);
+  top: -90px; right: -90px;
+}
+.dash-appointment-eyebrow { font-size: 13px; font-weight: 700; color: var(--pink); }
+.dash-appointment-info h2 { font-size: 26px; font-weight: 700; line-height: 1.25; }
+.dash-appointment-info > p { font-size: 14px; line-height: 1.6; color: rgba(255,255,255,0.85); }
+.dash-appointment-perks { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+.dash-appointment-perks li { display: flex; align-items: center; gap: 10px; font-size: 13.5px; font-weight: 600; }
+.dash-appointment-perks svg { width: 18px; height: 18px; color: var(--pink); flex-shrink: 0; }
+
+/* Right form panel (Book Appointment tab) + shared form styles (also used by Register Child) */
+.dash-appointment-main { flex: 1; padding: 40px 44px; }
+
+/* Register Child tab uses this heading style directly */
+.dash-appointment-header h2 {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--slate-63);
+  margin-bottom: 24px;
+  padding-bottom: 14px;
+  border-bottom: 2px solid var(--blue);
+}
+.dash-appointment-header h2 span { color: var(--blue); }
+
+.dash-appointment-form { display: flex; flex-direction: column; gap: 18px; }
+
+.dash-form-row { display: flex; gap: 20px; }
+.dash-form-row .dash-form-group { flex: 1; min-width: 0; }
+
+.dash-form-group { display: flex; flex-direction: column; }
+.dash-form-group label { font-size: 13px; font-weight: 700; color: var(--slate-63); margin-bottom: 6px; }
+.dash-form-group .dash-required { color: var(--rose); }
+
+.dash-form-group input,
+.dash-form-group select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  border: 1px solid #dde1e7;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--slate-63);
+}
+.dash-form-group input:focus,
+.dash-form-group select:focus {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+}
+
+.dash-btn-book {
+  align-self: flex-start;
+  background: var(--pink);
+  color: var(--white);
+  border: none;
+  border-radius: 24px;
+  padding: 12px 32px;
+  font-weight: 700;
+  font-size: 15px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+.dash-btn-book:hover { filter: brightness(0.94); }
+
+@media (max-width: 700px) {
+  .dash-appointment-card { flex-direction: column; }
+  .dash-appointment-info { flex-basis: auto; }
+}
+
+@media (max-width: 600px) {
+  .dash-form-row { flex-direction: column; }
+}

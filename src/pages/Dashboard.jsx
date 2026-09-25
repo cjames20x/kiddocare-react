@@ -33,6 +33,14 @@ const NAV_ITEMS = [
   { icon: HelpCircle, label: 'Help' },
 ]
 
+// These tabs are full standalone pages of their own, not internal dashboard tabs.
+// Clicking them should navigate there instead of switching activeTab.
+const ROUTE_TABS = {
+  Documents: '/documents',
+  Feedback: '/feedback',
+  Help: '/help',
+}
+
 export default function Dashboard() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
@@ -219,7 +227,13 @@ export default function Dashboard() {
             <div
               key={label}
               className={`dash-nav-item${activeTab === label ? ' active' : ''}`}
-              onClick={() => setActiveTab(label)}
+              onClick={() => {
+                if (ROUTE_TABS[label]) {
+                  navigate(ROUTE_TABS[label])
+                } else {
+                  setActiveTab(label)
+                }
+              }}
             >
               <Icon size={20} />
               <span>{label}</span>
@@ -483,11 +497,19 @@ export default function Dashboard() {
             minHeight: 'calc(100vh - 220px)',
             padding: '20px 0'
           }}>
-            <div className="appointment-card" style={{ width: '100%', maxWidth: '640px' }}>
-              <div className="appointment-header">
-                <h2>Book an <span>Appointment</span></h2>
+            <div className="appointment-card" style={{ width: '100%', maxWidth: '920px' }}>
+              <div className="appointment-info">
+                <span className="appointment-eyebrow">Pediatric care, on your schedule</span>
+                <h2>Book an appointment</h2>
+                <p>Tell us what your child needs and we'll match you with the right visit — usually confirmed the same day.</p>
+                <ul className="appointment-perks">
+                  <li><Check size={18} /> Open slots within this week</li>
+                  <li><Check size={18} /> Licensed pediatricians only</li>
+                  <li><Check size={18} /> Records saved to your account</li>
+                </ul>
               </div>
 
+              <div className="appointment-main">
               <form className="appointment-form" onSubmit={handleBookAppointment}>
                 <div className="form-group">
                   <label>
@@ -571,6 +593,7 @@ export default function Dashboard() {
 
                 <button type="submit" className="btn-book">Confirm Appointment</button>
               </form>
+              </div>
             </div>
           </div>
         )}
@@ -636,7 +659,8 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Other Tabs Placeholder */}
+        {/* Placeholder for tabs with no dedicated page yet (Vaccinations, Payments).
+            Documents/Feedback/Help now navigate to their own routes above, so they never reach here. */}
         {!['Dashboard', 'Child Information', 'Register Child', 'Book Appointments', 'Appointments'].includes(activeTab) && (
           <div className="dash-panel" style={{ textAlign: 'center', padding: '60px 20px' }}>
             <h3 style={{ justifyContent: 'center', borderBottom: 'none' }}>{activeTab}</h3>
