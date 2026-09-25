@@ -39,6 +39,8 @@ const ROUTE_TABS = {
   Documents: '/documents',
   Feedback: '/feedback',
   Help: '/help',
+  Vaccinations: '/vaccinations',
+  Payments: '/payments',
 }
 
 export default function Dashboard() {
@@ -286,7 +288,7 @@ export default function Dashboard() {
             <div
               className="dash-card"
               style={{ cursor: 'pointer' }}
-              onClick={() => setActiveTab('Payments')}
+              onClick={() => navigate('/payments')}
             >
               <div>
                 <div className="num">2</div>
