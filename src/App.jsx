@@ -7,6 +7,8 @@ import Dashboard from './pages/Dashboard.jsx'
 import Documents from './pages/Documents.jsx'
 import Feedback from './pages/Feedback.jsx'
 import Help from './pages/Help.jsx'
+import Vaccinations from './pages/Vaccinations.jsx'
+import Payments from './pages/Payments.jsx'
 import UserDashboard from "./pages/UserDashboard";
 
 export default function App() {
@@ -20,6 +22,8 @@ export default function App() {
       <Route path="/documents" element={<Documents />} />
       <Route path="/feedback" element={<Feedback />} />
       <Route path="/help" element={<Help />} />
+      <Route path="/vaccinations" element={<Vaccinations />} />
+      <Route path="/payments" element={<Payments />} />
       <Route path="/user-dashboard" element={<UserDashboard />}/>
     </Routes>
   )
