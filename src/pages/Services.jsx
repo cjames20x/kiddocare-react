@@ -64,27 +64,40 @@ export default function Services() {
       <section className="appointment-band">
         <img src="/images/bg-img.jpg" alt="" className="band-img" />
         <div className="appointment-card">
-          <div className="appointment-header">
-            <h2>Book an <span>Appointment</span></h2>
+          <div className="appointment-info">
+            <span className="appointment-eyebrow">Pediatric care, on your schedule</span>
+            <h2>Book an appointment</h2>
+            <p>Tell us what your child needs and we'll match you with the right visit — usually confirmed the same day.</p>
+            <ul className="appointment-perks">
+              <li>
+                <svg viewBox="0 0 20 20"><path d="M4 10.5l4 4 8-9" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                Open slots within this week
+              </li>
+              <li>
+                <svg viewBox="0 0 20 20"><path d="M4 10.5l4 4 8-9" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                Licensed pediatricians only
+              </li>
+              <li>
+                <svg viewBox="0 0 20 20"><path d="M4 10.5l4 4 8-9" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                Records saved to your account
+              </li>
+            </ul>
           </div>
 
-          {isLoggedIn ? (
-            <AppointmentForm />
-          ) : (
-            <div className="appointment-form" style={{ textAlign: 'center', gap: 12 }}>
-              <h3 style={{ color: 'var(--blue)', marginBottom: 4 }}>Want to Book an Appointment?</h3>
-              <p style={{ color: 'var(--slate-63)' }}>
-                Create a free account to book — it only takes a minute.
-              </p>
-              <Link to="/signup" className="btn-solid" style={{ display: 'inline-block', padding: '10px 24px' }}>
-                Sign Up
-              </Link>
-              <p style={{ fontSize: 13, color: 'var(--gray-73)' }}>
-                Already have an account?{' '}
-                <Link to="/login" style={{ color: 'var(--blue)', fontWeight: 700 }}>Log In</Link>
-              </p>
-            </div>
-          )}
+          <div className="appointment-main">
+            {isLoggedIn ? (
+              <AppointmentForm />
+            ) : (
+              <div className="appointment-gate">
+                <h3>You need to make an account first before booking an appointment</h3>
+                <p>It takes less than a minute, and your child's records stay in one place from then on.</p>
+                <Link to="/signup" className="btn-solid">Sign Up</Link>
+                <p className="appointment-gate-alt">
+                  Already have an account? <Link to="/login">Log In</Link>
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </section>
 
@@ -113,24 +126,27 @@ function AppointmentForm() {
 
   return (
     <form className="appointment-form" onSubmit={handleSubmit}>
-      <div>
-        <label>Patient's Name:</label>
-        <input type="text" value={user?.patientName || ''} readOnly disabled />
+      <h3 className="appointment-form-title">Your details</h3>
+
+      <div className="form-row">
+        <div className="form-group">
+          <label>Patient's Name</label>
+          <input type="text" value={user?.patientName || ''} readOnly disabled />
+        </div>
+        <div className="form-group">
+          <label>Guardian's Name</label>
+          <input type="text" value={user?.guardianName || ''} readOnly disabled />
+        </div>
       </div>
 
-      <div>
-        <label>Guardian's Name:</label>
-        <input type="text" value={user?.guardianName || ''} readOnly disabled />
-      </div>
-
-      <div>
-        <label>E-mail:</label>
+      <div className="form-group">
+        <label>E-mail</label>
         <input type="email" value={user?.email || ''} readOnly disabled />
       </div>
 
       <div className="form-row">
         <div className="form-group">
-          <label htmlFor="service">Service: <span className="required">*</span></label>
+          <label htmlFor="service">Service <span className="required">*</span></label>
           <select id="service" name="service" defaultValue="" required>
             <option value="" disabled>Select appointment type</option>
             <option value="checkup">Checkup</option>
@@ -139,13 +155,16 @@ function AppointmentForm() {
           </select>
         </div>
         <div className="form-group">
-          <label htmlFor="date">Date: <span className="required">*</span></label>
+          <label htmlFor="date">Date <span className="required">*</span></label>
           <input type="date" id="date" name="date" required min={minDate} max={maxDate} />
         </div>
       </div>
       <p className="field-hint">Appointments can only be booked within this week, based on doctor availability.</p>
 
-      <button type="submit" className="btn-book">Book Appointment</button>
+      <button type="submit" className="btn-book">
+        Book Appointment
+        <svg viewBox="0 0 20 20"><path d="M4 10h12M11 5l5 5-5 5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+      </button>
     </form>
   )
 }
