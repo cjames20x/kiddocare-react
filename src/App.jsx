@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard.jsx'
 import Documents from './pages/Documents.jsx'
 import Feedback from './pages/Feedback.jsx'
 import Help from './pages/Help.jsx'
+import UserDashboard from "./pages/UserDashboard";
 
 export default function App() {
   return (
@@ -19,6 +20,7 @@ export default function App() {
       <Route path="/documents" element={<Documents />} />
       <Route path="/feedback" element={<Feedback />} />
       <Route path="/help" element={<Help />} />
+      <Route path="/user-dashboard" element={<UserDashboard />}/>
     </Routes>
   )
 }
