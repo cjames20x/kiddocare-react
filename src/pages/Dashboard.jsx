@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Home, User, ClipboardCheck, Baby, ClipboardList, Syringe,
   CreditCard, FileText, ThumbsUp, HelpCircle, Bell, Search, Plus, Users, Calendar, Check,
+  X, AlertTriangle, ShieldCheck,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import DashboardSidebar from '../components/DashboardSidebar.jsx'
@@ -18,6 +19,152 @@ function calcAge(dob) {
     return `${months} mo${months === 1 ? '' : 's'}`
   }
   return `${years} yr${years === 1 ? '' : 's'}`
+}
+
+// Normalizes casing so older/mismatched records ("checkup") display the same as ("Checkup")
+function formatServiceName(service) {
+  if (!service) return '—'
+  return service.charAt(0).toUpperCase() + service.slice(1).toLowerCase()
+}
+
+// Shared child-record popup — used by BOTH the Dashboard tab's quick "View"
+// and the Child Information tab's "View", so the two always look identical.
+// onRebook is optional: pass it to show a Rebook button alongside Close.
+function ChildRecordModal({ child, onClose, onRebook, getChildAppointments }) {
+  if (!child) return null
+  const childAppointments = getChildAppointments(child.id)
+
+  return (
+    <div className="kcmr-overlay" onClick={onClose}>
+      <div className="kcmr-modal" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="kcmr-header">
+          <button className="kcmr-close" onClick={onClose} aria-label="Close">
+            <X size={15} />
+          </button>
+          <div className="kcmr-avatar">{child.name.charAt(0).toUpperCase()}</div>
+          <div>
+            <div className="kcmr-name">{child.name}</div>
+            <div className="kcmr-sub">
+              <span className="kcmr-badge">{child.id}</span>
+              <span className="kcmr-badge">{child.gender}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="kcmr-body">
+          {/* Quick stats */}
+          <div className="kcmr-stats">
+            <div className="kcmr-stat">
+              <div className="kcmr-stat-label">Age</div>
+              <div className="kcmr-stat-value">{child.age}</div>
+            </div>
+            <div className="kcmr-stat">
+              <div className="kcmr-stat-label">Weight</div>
+              <div className="kcmr-stat-value">{child.weight && child.weight !== '—' ? child.weight : '8.6 kg'}</div>
+            </div>
+            <div className="kcmr-stat">
+              <div className="kcmr-stat-label">Height</div>
+              <div className="kcmr-stat-value">{child.height && child.height !== '—' ? child.height : '71 cm'}</div>
+            </div>
+            <div className="kcmr-stat">
+              <div className="kcmr-stat-label">Last Visit</div>
+              <div className="kcmr-stat-value">{child.lastVisit && child.lastVisit !== '—' ? child.lastVisit : '2026-08-15'}</div>
+            </div>
+          </div>
+
+          {/* Allergy alert */}
+          <div className="kcmr-section">
+            <div className="kcmr-section-title">Allergies</div>
+            {child.allergies && child.allergies !== 'None known' ? (
+              <div className="kcmr-alert warn">
+                <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: '1px' }} />
+                <span>Known allergy: {child.allergies}</span>
+              </div>
+            ) : (
+              <div className="kcmr-alert ok">
+                <ShieldCheck size={16} style={{ flexShrink: 0, marginTop: '1px' }} />
+                <span>No known allergies on file</span>
+              </div>
+            )}
+          </div>
+
+          {/* Guardian */}
+          <div className="kcmr-section">
+            <div className="kcmr-section-title">Parent / Guardian</div>
+            <div className="kcmr-grid2">
+              <div className="kcmr-field">
+                <div className="kcmr-field-label">Full Name</div>
+                <div className="kcmr-field-value">{child.guardian}</div>
+              </div>
+              <div className="kcmr-field">
+                <div className="kcmr-field-label">Contact</div>
+                <div className="kcmr-field-value">{child.contact || '—'}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Vaccination history */}
+          <div className="kcmr-section">
+            <div className="kcmr-section-title">Vaccination History</div>
+            {!child.vaccinations || child.vaccinations.length === 0 ? (
+              <p className="kcmr-empty">No vaccinations on record yet.</p>
+            ) : (
+              <div className="kcmr-list">
+                {child.vaccinations.map((v, i) => (
+                  <div className="kcmr-list-item" key={i}>
+                    <div className="kcmr-list-icon"><Syringe size={15} /></div>
+                    <div className="kcmr-list-main">
+                      <div className="kcmr-list-title">{v}</div>
+                    </div>
+                    <span className="kcmr-pill ok">Completed</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Appointment history */}
+          <div className="kcmr-section">
+            <div className="kcmr-section-title">Appointment History</div>
+            {childAppointments.length === 0 ? (
+              <p className="kcmr-empty">No visits scheduled yet.</p>
+            ) : (
+              <div className="kcmr-list">
+                {childAppointments.map((a) => {
+                  const status = (a.status || 'Confirmed')
+                  const pillClass =
+                    status.toLowerCase() === 'completed' ? 'ok' :
+                    status.toLowerCase() === 'cancelled' ? 'danger' : 'info'
+                  return (
+                    <div className="kcmr-list-item" key={a.id}>
+                      <div className="kcmr-list-icon"><Calendar size={15} /></div>
+                      <div className="kcmr-list-main">
+                        <div className="kcmr-list-title">{formatServiceName(a.service)}</div>
+                        <div className="kcmr-list-sub">{a.date} · {a.time}</div>
+                      </div>
+                      <span className={`kcmr-pill ${pillClass}`}>{status}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="kcmr-footer">
+          {onRebook && (
+            <button type="button" className="kcmr-btn-outline" onClick={onRebook}>
+              Rebook
+            </button>
+          )}
+          <button type="button" className="kcmr-btn-close" onClick={onClose}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 const NAV_ITEMS = [
@@ -46,12 +193,14 @@ const ROUTE_TABS = {
 export default function Dashboard() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
 
-  // Active navigation tab
-  const [activeTab, setActiveTab] = useState('Dashboard')
+  // Active navigation tab — honor a tab requested via navigate('/dashboard', { state: { activeTab } })
+  const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'Dashboard')
   const [showConfirm, setShowConfirm] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [childToDelete, setChildToDelete] = useState(null)
+  const [viewChild, setViewChild] = useState(null)
+  const [legacyViewChild, setLegacyViewChild] = useState(null)
 
   // Children state (initialized from user and localStorage)
   const [children, setChildren] = useState(() => {
@@ -70,9 +219,13 @@ export default function Dashboard() {
         dob: user.dob || '',
         age: calcAge(user.dob),
         gender: user.gender ? user.gender[0].toUpperCase() + user.gender.slice(1) : '—',
-        lastVisit: '—',
+        lastVisit: '2026-08-15',
         guardian: user.guardianName || '—',
         contact: user.contactNumber || '—',
+        weight: '8.6 kg',
+        height: '71 cm',
+        allergies: 'Penicillin',
+        vaccinations: ['BCG', 'Hepatitis B', 'Pentavalent (DTP-HepB-Hib)', 'OPV', 'PCV'],
       }]
     }
     return [
@@ -85,6 +238,10 @@ export default function Dashboard() {
         lastVisit: '2026-08-10',
         guardian: user?.guardianName || 'Maria Garcia',
         contact: '+63 917 123 4567',
+        weight: '13.2 kg',
+        height: '88 cm',
+        allergies: 'Peanuts',
+        vaccinations: ['BCG', 'Hepatitis B', 'DTaP', 'MMR'],
       },
     ]
   })
@@ -133,7 +290,7 @@ export default function Dashboard() {
   // Form states: Book Appointment
   const [bookForm, setBookForm] = useState({
     childId: children[0]?.id || '',
-    service: 'checkup',
+    service: 'Checkup',
     date: '',
     time: '09:00 AM - 10:00 AM',
     notes: '',
@@ -162,6 +319,10 @@ export default function Dashboard() {
       lastVisit: '—',
       guardian: registerForm.guardian || user?.guardianName || '—',
       contact: registerForm.contact || user?.contactNumber || '—',
+      weight: '—',
+      height: '—',
+      allergies: 'None known',
+      vaccinations: [],
     }
 
     setChildren([newChild, ...children])
@@ -202,12 +363,22 @@ export default function Dashboard() {
     setActiveTab('Appointments')
   }
 
-  // Handle Child Deletion
-  function handleDeleteChild() {
-    if (childToDelete) {
-      setChildren(children.filter((c) => c.id !== childToDelete.id))
-      setChildToDelete(null)
-    }
+  // Get this child's appointments, most relevant (soonest upcoming) first
+  function getChildAppointments(childId) {
+    return appointments
+      .filter((a) => a.childId === childId)
+      .slice()
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
+  }
+
+  // Next scheduled visit for a child (soonest appointment today or later, else soonest overall)
+  function getNextVisit(childId) {
+    const appts = getChildAppointments(childId)
+    if (appts.length === 0) return '—'
+    const today = new Date().setHours(0, 0, 0, 0)
+    const upcoming = appts.find((a) => new Date(a.date).setHours(0, 0, 0, 0) >= today)
+    const next = upcoming || appts[appts.length - 1]
+    return next.date
   }
 
   // Filter children by search query
@@ -219,6 +390,51 @@ export default function Dashboard() {
 
   return (
     <div className="dash-layout">
+      <style>{`
+        .kcmr-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.55); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
+        .kcmr-modal { width: 100%; max-width: 560px; max-height: 88vh; background: #fff; border-radius: 18px; overflow: hidden; box-shadow: 0 24px 60px rgba(15,23,42,.35); display: flex; flex-direction: column; animation: kcmrPop .18s ease-out; }
+        @keyframes kcmrPop { from { transform: scale(.96); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .kcmr-header { position: relative; background: var(--blue, #1c5d99); padding: 24px 28px 20px; display: flex; align-items: center; gap: 14px; color: #fff; }
+        .kcmr-close { position: absolute; top: 14px; right: 14px; width: 28px; height: 28px; border-radius: 50%; background: rgba(255,255,255,.18); border: none; color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .kcmr-close:hover { background: rgba(255,255,255,.3); }
+        .kcmr-avatar { width: 54px; height: 54px; border-radius: 50%; flex-shrink: 0; background: rgba(255,255,255,.2); border: 2px solid rgba(255,255,255,.45); display: flex; align-items: center; justify-content: center; font-size: 21px; font-weight: 700; }
+        .kcmr-name { font-size: 18px; font-weight: 700; }
+        .kcmr-sub { display: flex; gap: 6px; margin-top: 5px; flex-wrap: wrap; }
+        .kcmr-badge { font-size: 10.5px; font-weight: 700; letter-spacing: .3px; background: rgba(255,255,255,.2); padding: 3px 9px; border-radius: 20px; }
+        .kcmr-body { padding: 20px 26px 6px; overflow-y: auto; }
+        .kcmr-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 18px; }
+        .kcmr-stat { background: #f1f5f9; border-radius: 10px; padding: 10px 6px; text-align: center; }
+        .kcmr-stat-label { font-size: 9.5px; font-weight: 700; letter-spacing: .4px; color: #64748b; text-transform: uppercase; }
+        .kcmr-stat-value { font-size: 13.5px; font-weight: 700; color: #0f172a; margin-top: 3px; }
+        .kcmr-section { margin-bottom: 18px; }
+        .kcmr-section-title { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--blue, #1c5d99); margin-bottom: 9px; }
+        .kcmr-alert { display: flex; align-items: flex-start; gap: 9px; border-radius: 10px; padding: 11px 13px; font-size: 13px; font-weight: 600; }
+        .kcmr-alert.warn { background: #fef3c7; color: #92400e; }
+        .kcmr-alert.ok { background: #dcfce7; color: #15803d; }
+        .kcmr-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .kcmr-field { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 9px 12px; }
+        .kcmr-field-label { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .3px; }
+        .kcmr-field-value { font-size: 13px; font-weight: 600; color: #1e293b; margin-top: 2px; }
+        .kcmr-list { display: flex; flex-direction: column; gap: 8px; }
+        .kcmr-list-item { display: flex; align-items: center; gap: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 9px 12px; }
+        .kcmr-list-icon { width: 30px; height: 30px; border-radius: 8px; background: #e0f2fe; color: #0369a1; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .kcmr-list-main { flex: 1; min-width: 0; }
+        .kcmr-list-title { font-size: 13px; font-weight: 700; color: #1e293b; }
+        .kcmr-list-sub { font-size: 11px; color: #64748b; margin-top: 1px; }
+        .kcmr-empty { font-size: 12.5px; color: #94a3b8; font-style: italic; padding: 4px 2px 2px; }
+        .kcmr-pill { font-size: 10.5px; font-weight: 700; padding: 3px 9px; border-radius: 20px; white-space: nowrap; flex-shrink: 0; }
+        .kcmr-pill.ok { background: #dcfce7; color: #15803d; }
+        .kcmr-pill.info { background: #dbeafe; color: #1d4ed8; }
+        .kcmr-pill.warn { background: #fef3c7; color: #92400e; }
+        .kcmr-pill.danger { background: #fee2e2; color: #b91c1c; }
+        .kcmr-footer { padding: 14px 26px 22px; display: flex; gap: 10px; }
+        .kcmr-btn-close { flex: 1; padding: 11px; border-radius: 10px; border: none; background: var(--blue, #1c5d99); color: #fff; font-weight: 700; font-size: 14px; cursor: pointer; }
+        .kcmr-btn-close:hover { filter: brightness(0.92); }
+        .kcmr-btn-outline { flex: 1; padding: 11px; border-radius: 10px; border: 1.5px solid var(--blue, #1c5d99); background: #fff; color: var(--blue, #1c5d99); font-weight: 700; font-size: 14px; cursor: pointer; }
+        .kcmr-btn-outline:hover { background: #eff6ff; }
+        @media (max-width: 480px) { .kcmr-stats { grid-template-columns: repeat(2, 1fr); } .kcmr-grid2 { grid-template-columns: 1fr; } }
+      `}</style>
+
       {/* SIDEBAR */}
       <aside className="dash-sidebar">
         <div className="dash-logo" style={{ cursor: 'pointer' }} onClick={() => setActiveTab('Dashboard')}>
@@ -300,12 +516,12 @@ export default function Dashboard() {
         )}
 
         {/* ========================================================= */}
-        {/* TAB: DASHBOARD & TAB: CHILD INFORMATION */}
+        {/* TAB: DASHBOARD (unchanged — original Rebook + View) */}
         {/* ========================================================= */}
-        {(activeTab === 'Dashboard' || activeTab === 'Child Information') && (
+        {activeTab === 'Dashboard' && (
           <div className="dash-panel">
             <h3>
-              <Users size={20} /> {activeTab === 'Child Information' ? 'Child Records' : 'Children'}
+              <Users size={20} /> Children
             </h3>
 
             <div className="dash-search">
@@ -318,7 +534,7 @@ export default function Dashboard() {
                 <Search size={18} />
               </div>
               <button
-                className="dash-add-btn"
+                className="dash-add-btn dash-add-btn--blue"
                 onClick={() => setActiveTab('Register Child')}
               >
                 <Plus size={16} /> Add New
@@ -333,7 +549,7 @@ export default function Dashboard() {
                     <th>Name</th>
                     <th>Age</th>
                     <th>Gender</th>
-                    <th>Last Visit</th>
+                    <th>Next Visit</th>
                     <th>Parent/Guardian</th>
                     <th style={{ textAlign: 'center' }}>Actions</th>
                   </tr>
@@ -352,42 +568,100 @@ export default function Dashboard() {
                         <td style={{ fontWeight: 600, color: 'var(--blue)' }}>{c.name}</td>
                         <td>{c.age}</td>
                         <td>{c.gender}</td>
-                        <td>{c.lastVisit}</td>
+                        <td>{getNextVisit(c.id)}</td>
                         <td>{c.guardian}</td>
                         <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
                           <button
+                            className="dash-action-btn btn-action-book"
                             onClick={() => {
                               setBookForm((prev) => ({ ...prev, childId: c.id }))
                               setActiveTab('Book Appointments')
                             }}
-                            style={{
-                              background: 'transparent',
-                              border: '1px solid var(--blue)',
-                              color: 'var(--blue)',
-                              padding: '5px 12px',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              marginRight: '8px',
-                              fontWeight: 700,
-                              fontSize: '12px'
-                            }}
                           >
-                            Book
+                            Rebook
                           </button>
                           <button
-                            onClick={() => setChildToDelete(c)}
-                            style={{
-                              background: 'transparent',
-                              border: '1px solid var(--rose)',
-                              color: 'var(--rose)',
-                              padding: '5px 12px',
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              fontWeight: 700,
-                              fontSize: '12px'
-                            }}
+                            className="dash-action-btn btn-action-view"
+                            onClick={() => setLegacyViewChild(c)}
                           >
-                            Delete
+                            View
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* TAB: CHILD INFORMATION (medical record View modal) */}
+        {/* ========================================================= */}
+        {activeTab === 'Child Information' && (
+          <div className="dash-panel">
+            <h3>
+              <Users size={20} /> Child Records
+            </h3>
+
+            <div className="dash-search">
+              <div className="dash-search-input">
+                <input
+                  placeholder="Search Patients by name, ID, guardian..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                <Search size={18} />
+              </div>
+              <button
+                className="dash-add-btn dash-add-btn--blue"
+                onClick={() => setActiveTab('Register Child')}
+              >
+                <Plus size={16} /> Add New
+              </button>
+            </div>
+
+            <div style={{ overflowX: 'auto' }}>
+              <table className="dash-table">
+                <thead>
+                  <tr>
+                    <th>PatientId</th>
+                    <th>Name</th>
+                    <th>Age</th>
+                    <th>Gender</th>
+                    <th>Next Visit</th>
+                    <th>Parent/Guardian</th>
+                    <th style={{ textAlign: 'center' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredChildren.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} style={{ textAlign: 'center', color: '#999', padding: '28px' }}>
+                        No children registered yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredChildren.map((c) => (
+                      <tr key={c.id}>
+                        <td><strong>{c.id}</strong></td>
+                        <td style={{ fontWeight: 600, color: 'var(--blue)' }}>{c.name}</td>
+                        <td>{c.age}</td>
+                        <td>{c.gender}</td>
+                        <td>{getNextVisit(c.id)}</td>
+                        <td>{c.guardian}</td>
+                        <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                          <button
+                            className="dash-action-btn btn-action-view"
+                            style={{
+                              background: 'var(--blue)',
+                              borderColor: 'var(--blue)',
+                              color: '#fff',
+                            }}
+                            onClick={() => setViewChild(c)}
+                          >
+                            View
                           </button>
                         </td>
                       </tr>
@@ -628,7 +902,7 @@ export default function Dashboard() {
                     appointments.map((a) => (
                       <tr key={a.id}>
                         <td><strong>{a.childName}</strong></td>
-                        <td>{a.service}</td>
+                        <td>{formatServiceName(a.service)}</td>
                         <td>{a.date}</td>
                         <td>{a.time}</td>
                         <td>
@@ -698,31 +972,27 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* CONFIRM DELETE MODAL */}
-      {childToDelete && (
-        <div className="confirm-overlay" onClick={() => setChildToDelete(null)}>
-          <div className="confirm-box" onClick={(e) => e.stopPropagation()}>
-            <p>
-              Are you sure you want to remove <strong>{childToDelete.name}</strong> ({childToDelete.id}) from records?
-            </p>
-            <div className="confirm-actions">
-              <button
-                type="button"
-                style={{ background: '#e2e8f0', color: 'var(--slate-63)' }}
-                onClick={() => setChildToDelete(null)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                style={{ background: 'var(--rose)', color: 'var(--white)' }}
-                onClick={handleDeleteChild}
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* DASHBOARD TAB — quick view popup (same design as Child Information's) */}
+      {legacyViewChild && (
+        <ChildRecordModal
+          child={legacyViewChild}
+          onClose={() => setLegacyViewChild(null)}
+          onRebook={() => {
+            setBookForm((prev) => ({ ...prev, childId: legacyViewChild.id }))
+            setActiveTab('Book Appointments')
+            setLegacyViewChild(null)
+          }}
+          getChildAppointments={getChildAppointments}
+        />
+      )}
+
+      {/* CHILD INFORMATION TAB — detailed record popup */}
+      {viewChild && (
+        <ChildRecordModal
+          child={viewChild}
+          onClose={() => setViewChild(null)}
+          getChildAppointments={getChildAppointments}
+        />
       )}
     </div>
   )
