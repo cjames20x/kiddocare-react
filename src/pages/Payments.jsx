@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Bell, CreditCard, Receipt, Wallet } from 'lucide-react'
+import { Bell, CreditCard } from 'lucide-react'
 import DashboardSidebar from '../components/DashboardSidebar.jsx'
 
 const STORAGE_KEY = 'kiddocare-payments'
@@ -55,7 +55,9 @@ export default function Payments() {
   const [mode, setMode] = useState('')
   const [confirmed, setConfirmed] = useState(false)
 
-  const pending = payments.filter((p) => p.status === 'Pending')
+  const pending = payments.filter(
+    (p) => p.status === 'Pending'
+  )
 
   const totalPaid = payments
     .filter((p) => p.status === 'Paid')
@@ -68,7 +70,10 @@ export default function Payments() {
 
   function savePayments(next) {
     setPayments(next)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(next)
+    )
   }
 
   function pickPending(row) {
@@ -105,9 +110,10 @@ export default function Payments() {
 
       <main className="dash-main">
 
-        {/* TOP BAR */}
         <div className="dash-topbar">
-          <h1 className="dash-title">PAYMENTS</h1>
+          <h1 className="dash-title">
+            PAYMENTS
+          </h1>
 
           <div className="dash-bell">
             <Bell size={20} />
@@ -115,14 +121,14 @@ export default function Payments() {
           </div>
         </div>
 
-        {/* PAYMENT HISTORY */}
         {view === 'history' && (
           <>
             <div className="pay-summary">
 
-              {/* TOTAL PAID */}
               <div className="pay-summary-card">
-                <div>
+
+                <div className="pay-summary-content">
+
                   <div className="pay-summary-amount">
                     {peso(totalPaid)}
                   </div>
@@ -130,37 +136,181 @@ export default function Payments() {
                   <div className="pay-summary-label">
                     Total Paid
                   </div>
+
                 </div>
 
-                <Receipt
-                  size={64}
+                <svg
                   className="pay-summary-icon"
-                />
+                  width="100"
+                  height="130"
+                  viewBox="0 0 100 130"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="
+                      M20 8
+                      H80
+                      V122
+                      L70 116
+                      L60 122
+                      L50 116
+                      L40 122
+                      L30 116
+                      L20 122
+                      Z
+                    "
+                    fill="#4588cd"
+                  />
+
+                  <rect
+                    x="32"
+                    y="35"
+                    width="36"
+                    height="7"
+                    rx="3"
+                    fill="#3465ae"
+                  />
+
+                  <rect
+                    x="32"
+                    y="50"
+                    width="28"
+                    height="6"
+                    rx="3"
+                    fill="#3465ae"
+                  />
+
+                  <rect
+                    x="32"
+                    y="65"
+                    width="36"
+                    height="6"
+                    rx="3"
+                    fill="#3465ae"
+                  />
+
+                  <circle
+                    cx="50"
+                    cy="91"
+                    r="14"
+                    fill="#3465ae"
+                  />
+
+                  <path
+                    d="
+                      M50 82
+                      V100
+                      M44 88
+                      H55
+                      C58 88 58 94 54 94
+                      H46
+                      C42 94 42 100 46 100
+                      H56
+                    "
+                    stroke="#4588cd"
+                    strokeWidth="3"
+                    fill="none"
+                    strokeLinecap="round"
+                  />
+                </svg>
+
               </div>
 
-              {/* PENDING BALANCE */}
               <div className="pay-summary-card">
-                <div>
+
+                <div className="pay-summary-content">
+
                   <div className="pay-summary-amount">
                     {pendingBalance > 0
                       ? peso(pendingBalance)
-                      : '₱'}
+                      : '₱0'}
                   </div>
 
                   <div className="pay-summary-label">
                     Pending Balance
                   </div>
+
                 </div>
 
-                <Wallet
-                  size={64}
+                <svg
                   className="pay-summary-icon"
-                />
+                  width="116"
+                  height="130"
+                  viewBox="0 0 116 130"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="
+                      M8 35
+                      H98
+                      A10 10 0 0 1 108 45
+                      V118
+                      H8
+                      Z
+                    "
+                    fill="#4588cd"
+                  />
+
+                  <rect
+                    x="8"
+                    y="50"
+                    width="100"
+                    height="15"
+                    rx="3"
+                    fill="#3465ae"
+                  />
+
+                  <path
+                    d="
+                      M20 35
+                      V25
+                      A8 8 0 0 1 28 17
+                      H94
+                      A8 8 0 0 1 102 25
+                      V35
+                    "
+                    fill="#4588cd"
+                  />
+
+                  <rect
+                    x="57"
+                    y="77"
+                    width="51"
+                    height="28"
+                    rx="6"
+                    fill="#3465ae"
+                  />
+
+                  <circle
+                    cx="68"
+                    cy="91"
+                    r="5"
+                    fill="#4588cd"
+                  />
+
+                  <rect
+                    x="20"
+                    y="78"
+                    width="25"
+                    height="5"
+                    rx="2"
+                    fill="#3465ae"
+                  />
+
+                  <rect
+                    x="20"
+                    y="90"
+                    width="18"
+                    height="5"
+                    rx="2"
+                    fill="#3465ae"
+                  />
+                </svg>
+
               </div>
 
             </div>
 
-            {/* PAYMENT HISTORY TABLE */}
             <section className="dash-panel">
 
               <h3>
@@ -169,6 +319,7 @@ export default function Payments() {
               </h3>
 
               <div style={{ overflowX: 'auto' }}>
+
                 <table className="dash-table">
 
                   <thead>
@@ -181,34 +332,47 @@ export default function Payments() {
                   </thead>
 
                   <tbody>
+
                     {payments.map((row) => (
+
                       <tr key={row.id}>
 
-                        <td>{row.date}</td>
-
-                        <td>{row.service}</td>
-
-                        <td>{peso(row.amount)}</td>
+                        <td>
+                          {row.date}
+                        </td>
 
                         <td>
+                          {row.service}
+                        </td>
+
+                        <td>
+                          {peso(row.amount)}
+                        </td>
+
+                        <td>
+
                           <span
                             className={`pay-status pay-status--${row.status.toLowerCase()}`}
                           >
                             {row.status}
                           </span>
+
                         </td>
 
                       </tr>
+
                     ))}
+
                   </tbody>
 
                 </table>
+
               </div>
 
             </section>
 
-            {/* PAY NOW BUTTON */}
             {pendingBalance > 0 && (
+
               <div className="pay-now-wrap">
 
                 <button
@@ -220,12 +384,14 @@ export default function Payments() {
                 </button>
 
               </div>
+
             )}
+
           </>
         )}
 
-        {/* PENDING PAYMENTS */}
         {view === 'pending' && (
+
           <section className="dash-panel">
 
             <h3>
@@ -253,17 +419,24 @@ export default function Payments() {
                 <tbody>
 
                   {pending.map((row) => (
+
                     <tr
                       key={row.id}
                       className="pay-pending-row"
                       onClick={() => pickPending(row)}
                     >
 
-                      <td>{row.date}</td>
+                      <td>
+                        {row.date}
+                      </td>
 
-                      <td>{row.service}</td>
+                      <td>
+                        {row.service}
+                      </td>
 
-                      <td>{peso(row.amount)}</td>
+                      <td>
+                        {peso(row.amount)}
+                      </td>
 
                       <td>
                         <span className="pay-status pay-status--pending">
@@ -272,6 +445,7 @@ export default function Payments() {
                       </td>
 
                     </tr>
+
                   ))}
 
                 </tbody>
@@ -281,10 +455,11 @@ export default function Payments() {
             </div>
 
           </section>
+
         )}
 
-        {/* PAYMENT FORM */}
         {view === 'form' && selected && (
+
           <section
             className={`dash-panel pay-form-panel${
               confirmed ? ' is-blurred' : ''
@@ -300,6 +475,7 @@ export default function Payments() {
               <div className="pay-modes pay-modes--form">
 
                 {PAYMENT_MODES.map((option) => (
+
                   <label
                     key={option}
                     className="pay-mode"
@@ -319,14 +495,16 @@ export default function Payments() {
                     {option}
 
                   </label>
+
                 ))}
 
               </div>
 
-              {/* TOTAL AMOUNT */}
               <div className="pay-total-bar">
 
-                <span>Total Amount</span>
+                <span>
+                  Total Amount
+                </span>
 
                 <span>
                   {peso(selected.amount)}
@@ -334,7 +512,6 @@ export default function Payments() {
 
               </div>
 
-              {/* CONFIRM BUTTON */}
               <div className="pay-now-wrap">
 
                 <button
@@ -349,12 +526,13 @@ export default function Payments() {
             </form>
 
           </section>
+
         )}
 
       </main>
 
-      {/* PAYMENT CONFIRMATION MODAL */}
       {confirmed && (
+
         <div className="confirm-overlay">
 
           <div
@@ -392,6 +570,7 @@ export default function Payments() {
           </div>
 
         </div>
+
       )}
 
     </div>

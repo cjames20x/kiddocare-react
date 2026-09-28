@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
-  Home, User, ClipboardCheck, Baby, ClipboardList, Syringe,
-  CreditCard, FileText, ThumbsUp, HelpCircle, Bell, Search, Plus, Users, Calendar, Check,
+  Baby, ClipboardList, Syringe,
+  Bell, Search, Plus, Users, Calendar, Check,
   X, AlertTriangle, ShieldCheck,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
@@ -19,6 +19,13 @@ function calcAge(dob) {
     return `${months} mo${months === 1 ? '' : 's'}`
   }
   return `${years} yr${years === 1 ? '' : 's'}`
+}
+
+// Today as YYYY-MM-DD in the user's LOCAL timezone (toISOString would use UTC and can be off by a day)
+function todayLocal() {
+  const d = new Date()
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
 // Normalizes casing so older/mismatched records ("checkup") display the same as ("Checkup")
@@ -167,37 +174,13 @@ function ChildRecordModal({ child, onClose, onRebook, getChildAppointments }) {
   )
 }
 
-const NAV_ITEMS = [
-  { icon: Home, label: 'Dashboard' },
-  { icon: User, label: 'Child Information' },
-  { icon: ClipboardCheck, label: 'Book Appointments' },
-  { icon: Baby, label: 'Register Child' },
-  { icon: ClipboardList, label: 'Appointments' },
-  { icon: Syringe, label: 'Vaccinations' },
-  { icon: CreditCard, label: 'Payments' },
-  { icon: FileText, label: 'Documents' },
-  { icon: ThumbsUp, label: 'Feedback' },
-  { icon: HelpCircle, label: 'Help' },
-]
-
-// These tabs are full standalone pages of their own, not internal dashboard tabs.
-// Clicking them should navigate there instead of switching activeTab.
-const ROUTE_TABS = {
-  Documents: '/documents',
-  Feedback: '/feedback',
-  Help: '/help',
-  Vaccinations: '/vaccinations',
-  Payments: '/payments',
-}
-
 export default function Dashboard() {
-  const { user, logout } = useAuth()
+  const { user } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
   // Active navigation tab — honor a tab requested via navigate('/dashboard', { state: { activeTab } })
   const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'Dashboard')
-  const [showConfirm, setShowConfirm] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [viewChild, setViewChild] = useState(null)
   const [legacyViewChild, setLegacyViewChild] = useState(null)
@@ -277,6 +260,12 @@ export default function Dashboard() {
     localStorage.setItem('kiddocare-appointments', JSON.stringify(appointments))
   }, [appointments])
 
+  // The shared sidebar switches tabs by navigating to /dashboard with state,
+  // so keep activeTab in sync whenever that navigation happens.
+  useEffect(() => {
+    if (location.state?.activeTab) setActiveTab(location.state.activeTab)
+  }, [location.key])
+
   // Form states: Register Child
   const [registerForm, setRegisterForm] = useState({
     name: '',
@@ -295,11 +284,6 @@ export default function Dashboard() {
     time: '09:00 AM - 10:00 AM',
     notes: '',
   })
-
-  function confirmLogout() {
-    logout()
-    navigate('/')
-  }
 
   // Handle Child Registration
   function handleRegisterChild(e) {
@@ -391,6 +375,15 @@ export default function Dashboard() {
   return (
     <div className="dash-layout">
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;800&display=swap');
+        .kcc-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px; margin-bottom: 34px; }
+        .kcc-card { position: relative; height: 130px; border-radius: 6px; overflow: hidden; cursor: pointer; display: flex; align-items: center; padding-left: 23px; color: #fff; font-family: 'Montserrat', sans-serif; background: linear-gradient(90deg, #76aff1 0%, #4f88d6 16%, #4177c3 50%, #2d5ca2 100%); box-shadow: 0 4px 8px rgba(0,0,0,.16); transition: transform .15s ease, box-shadow .15s ease; }
+        .kcc-card:hover { transform: translateY(-2px); box-shadow: 0 8px 16px rgba(0,0,0,.22); }
+        .kcc-text { position: relative; z-index: 2; }
+        .kcc-num { font-size: 40px; font-weight: 800; line-height: 44px; }
+        .kcc-label { width: min-content; font-size: 20px; font-weight: 500; line-height: 24px; }
+        .kcc-icon { position: absolute; right: 0; bottom: 0; z-index: 1; }
+        @media (max-width: 900px) { .kcc-cards { grid-template-columns: 1fr; } }
         .kcmr-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.55); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
         .kcmr-modal { width: 100%; max-width: 560px; max-height: 88vh; background: #fff; border-radius: 18px; overflow: hidden; box-shadow: 0 24px 60px rgba(15,23,42,.35); display: flex; flex-direction: column; animation: kcmrPop .18s ease-out; }
         @keyframes kcmrPop { from { transform: scale(.96); opacity: 0; } to { transform: scale(1); opacity: 1; } }
@@ -436,32 +429,7 @@ export default function Dashboard() {
       `}</style>
 
       {/* SIDEBAR */}
-      <aside className="dash-sidebar">
-        <div className="dash-logo" style={{ cursor: 'pointer' }} onClick={() => setActiveTab('Dashboard')}>
-          <img src="/images/kiddocare-logo.png" alt="KiddoCare" />
-        </div>
-        <nav className="dash-nav">
-          {NAV_ITEMS.map(({ icon: Icon, label }) => (
-            <div
-              key={label}
-              className={`dash-nav-item${activeTab === label ? ' active' : ''}`}
-              onClick={() => {
-                if (ROUTE_TABS[label]) {
-                  navigate(ROUTE_TABS[label])
-                } else {
-                  setActiveTab(label)
-                }
-              }}
-            >
-              <Icon size={20} />
-              <span>{label}</span>
-            </div>
-          ))}
-        </nav>
-        <div className="dash-logout-wrap">
-          <button className="dash-logout-btn" onClick={() => setShowConfirm(true)}>Logout</button>
-        </div>
-      </aside>
+      <DashboardSidebar active={activeTab} />
 
       {/* MAIN CONTENT AREA */}
       <main className="dash-main">
@@ -474,43 +442,49 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Quick Stat Cards (Hidden on Book Appointments) */}
-        {activeTab !== 'Book Appointments' && (
-          <div className="dash-cards">
-            <div
-              className="dash-card"
-              style={{ cursor: 'pointer' }}
-              onClick={() => setActiveTab('Child Information')}
-            >
-              <div>
-                <div className="num">{children.length}</div>
-                <div>Children</div>
+        {/* Quick Stat Cards (Hidden on Book Appointments and Register Child) */}
+        {!['Book Appointments', 'Register Child'].includes(activeTab) && (
+          <div className="kcc-cards">
+            <div className="kcc-card" onClick={() => setActiveTab('Child Information')}>
+              <div className="kcc-text">
+                <div className="kcc-num">{children.length}</div>
+                <div className="kcc-label">Children</div>
               </div>
-              <User size={44} className="dash-card-icon" />
+              <svg className="kcc-icon" width="100" height="130" viewBox="0 0 100 130" aria-hidden="true">
+                <rect x="24" y="27" width="54" height="57" rx="26" fill="#4588cd" />
+                <path d="M0 130 C0 110 22 99 50 99 C78 99 100 110 100 130 Z" fill="#4588cd" />
+              </svg>
             </div>
 
-            <div
-              className="dash-card"
-              style={{ cursor: 'pointer' }}
-              onClick={() => setActiveTab('Appointments')}
-            >
-              <div>
-                <div className="num">{appointments.length}</div>
-                <div>Upcoming Appointment{appointments.length === 1 ? '' : 's'}</div>
+            <div className="kcc-card" onClick={() => setActiveTab('Appointments')}>
+              <div className="kcc-text">
+                <div className="kcc-num">{appointments.length}</div>
+                <div className="kcc-label">Upcoming Appointment{appointments.length === 1 ? '' : 's'}</div>
               </div>
-              <Calendar size={44} className="dash-card-icon" />
+              <svg className="kcc-icon" width="100" height="130" viewBox="0 0 100 130" aria-hidden="true">
+                <path d="M12 32 H89 A10 10 0 0 1 99 42 V130 H2 V42 A10 10 0 0 1 12 32 Z" fill="#4588cd" />
+                <rect x="10" y="40" width="80" height="18" rx="3" fill="#3465ae" />
+                <rect x="45" y="71" width="27" height="27" rx="7" fill="#3465ae" />
+                <rect x="54.5" y="80.5" width="8" height="8" rx="1" fill="#4588cd" />
+                <g fill="#3465ae">
+                  <circle cx="31" cy="76" r="4" /><circle cx="85" cy="76" r="4" />
+                  <circle cx="14" cy="93" r="4" /><circle cx="85" cy="93" r="4" />
+                  <circle cx="14" cy="111" r="4" /><circle cx="31" cy="111" r="4" />
+                  <circle cx="49" cy="111" r="4" /><circle cx="68" cy="111" r="4" />
+                </g>
+              </svg>
             </div>
 
-            <div
-              className="dash-card"
-              style={{ cursor: 'pointer' }}
-              onClick={() => navigate('/payments')}
-            >
-              <div>
-                <div className="num">2</div>
-                <div>Pending Payments</div>
+            <div className="kcc-card" onClick={() => navigate('/payments')}>
+              <div className="kcc-text">
+                <div className="kcc-num">2</div>
+                <div className="kcc-label">Pending Payments</div>
               </div>
-              <CreditCard size={44} className="dash-card-icon" />
+              <svg className="kcc-icon" width="116" height="130" viewBox="0 0 116 130" aria-hidden="true">
+                <path d="M13 42 H116 V130 H3 V52 A10 10 0 0 1 13 42 Z" fill="#4588cd" />
+                <rect x="3" y="55" width="113" height="14" fill="#3768b1" />
+                <rect x="16" y="77" width="35" height="5" rx="2" fill="#3768b1" />
+              </svg>
             </div>
           </div>
         )}
@@ -702,6 +676,7 @@ export default function Dashboard() {
                   </label>
                   <input
                     type="date"
+                    max={todayLocal()}
                     value={registerForm.dob}
                     onChange={(e) => setRegisterForm({ ...registerForm, dob: e.target.value })}
                     required
@@ -826,6 +801,7 @@ export default function Dashboard() {
                     </label>
                     <input
                       type="date"
+                      min={todayLocal()}
                       value={bookForm.date}
                       onChange={(e) => setBookForm({ ...bookForm, date: e.target.value })}
                       required
@@ -946,31 +922,6 @@ export default function Dashboard() {
           </div>
         )}
       </main>
-
-      {/* CONFIRM LOGOUT MODAL */}
-      {showConfirm && (
-        <div className="confirm-overlay" onClick={() => setShowConfirm(false)}>
-          <div className="confirm-box" onClick={(e) => e.stopPropagation()}>
-            <p>Are you sure you want to log out?</p>
-            <div className="confirm-actions">
-              <button
-                type="button"
-                style={{ background: '#e2e8f0', color: 'var(--slate-63)' }}
-                onClick={() => setShowConfirm(false)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                style={{ background: 'var(--rose)', color: 'var(--white)' }}
-                onClick={confirmLogout}
-              >
-                Yes
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* DASHBOARD TAB — quick view popup (same design as Child Information's) */}
       {legacyViewChild && (
