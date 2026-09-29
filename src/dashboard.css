@@ -118,10 +118,16 @@
   border-radius: 50%;
   border: 2px solid var(--blue);
   color: var(--blue);
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
 }
+
+.dash-bell:hover { background: rgba(44, 90, 160, 0.08); }
+.dash-bell:focus-visible { outline: 3px solid rgba(44, 90, 160, 0.3); outline-offset: 3px; }
 
 .dash-bell-dot {
   position: absolute;

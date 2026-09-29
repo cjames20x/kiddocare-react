@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Bell, CreditCard } from 'lucide-react'
+import { CreditCard } from 'lucide-react'
 import DashboardSidebar from '../components/DashboardSidebar.jsx'
+import NotificationButton from '../components/NotificationButton.jsx'
 
 const STORAGE_KEY = 'kiddocare-payments'
 
@@ -115,10 +116,7 @@ export default function Payments() {
             PAYMENTS
           </h1>
 
-          <div className="dash-bell">
-            <Bell size={20} />
-            <span className="dash-bell-dot" />
-          </div>
+          <NotificationButton />
         </div>
 
         {view === 'history' && (

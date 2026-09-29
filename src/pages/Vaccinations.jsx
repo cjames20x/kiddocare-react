@@ -1,5 +1,6 @@
-import { Bell, Syringe } from 'lucide-react'
+import { Syringe } from 'lucide-react'
 import DashboardSidebar from '../components/DashboardSidebar.jsx'
+import NotificationButton from '../components/NotificationButton.jsx'
 
 // Records will come from the admin/clinic side later.
 const RECORDS = []
@@ -12,10 +13,7 @@ export default function Vaccinations() {
       <main className="dash-main">
         <div className="dash-topbar">
           <h1 className="dash-title">VACCINATIONS</h1>
-          <div className="dash-bell">
-            <Bell size={20} />
-            <span className="dash-bell-dot" />
-          </div>
+          <NotificationButton />
         </div>
 
         <section className="dash-panel">

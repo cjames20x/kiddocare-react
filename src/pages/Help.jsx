@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { Bell, Users, MessageCircleQuestion, ChevronDown, X, Send, CheckCircle2 } from 'lucide-react'
+import { Users, MessageCircleQuestion, ChevronDown, X, Send, CheckCircle2 } from 'lucide-react'
 import DashboardSidebar from '../components/DashboardSidebar.jsx'
+import NotificationButton from '../components/NotificationButton.jsx'
 
 const FAQS = [
   {
@@ -128,10 +129,7 @@ export default function Help() {
       <main className="dash-main">
         <div className="dash-topbar">
           <h1 className="dash-title">HELP</h1>
-          <div className="dash-bell">
-            <Bell size={20} />
-            <span className="dash-bell-dot" />
-          </div>
+          <NotificationButton />
         </div>
 
         <section className={`dash-panel help-panel${askOpen ? ' is-blurred' : ''}`}>
