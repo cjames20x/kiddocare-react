@@ -41,6 +41,7 @@ export default function Login() {
             <button type="submit" className="btn-primary">Login account</button>
           </form>
           <p className="auth-links">Don't have an account? <Link to="/signup">Sign Up</Link></p>
+          <p className="auth-links" style={{marginTop: '0.5rem', fontSize: '0.85rem'}}><Link to="/admin">Admin Login</Link></p>
         </div>
       </div>
       <Footer />
