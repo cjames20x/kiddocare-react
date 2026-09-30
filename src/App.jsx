@@ -10,21 +10,26 @@ import Help from './pages/Help.jsx'
 import Vaccinations from './pages/Vaccinations.jsx'
 import Payments from './pages/Payments.jsx'
 import UserDashboard from "./pages/UserDashboard";
+import { NotificationProvider } from './context/NotificationContext.jsx'
+import NotificationBar from './components/NotificationBar.jsx'
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Home />} />
-      <Route path="/services" element={<Services />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/signup" element={<Signup />} />
-      <Route path="/dashboard" element={<Dashboard />} />
-      <Route path="/documents" element={<Documents />} />
-      <Route path="/feedback" element={<Feedback />} />
-      <Route path="/help" element={<Help />} />
-      <Route path="/vaccinations" element={<Vaccinations />} />
-      <Route path="/payments" element={<Payments />} />
-      <Route path="/user-dashboard" element={<UserDashboard />}/>
-    </Routes>
+    <NotificationProvider>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/services" element={<Services />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/documents" element={<Documents />} />
+        <Route path="/feedback" element={<Feedback />} />
+        <Route path="/help" element={<Help />} />
+        <Route path="/vaccinations" element={<Vaccinations />} />
+        <Route path="/payments" element={<Payments />} />
+        <Route path="/user-dashboard" element={<UserDashboard />}/>
+      </Routes>
+      <NotificationBar />
+    </NotificationProvider>
   )
 }
