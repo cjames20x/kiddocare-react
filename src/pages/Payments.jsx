@@ -139,8 +139,6 @@ export default function Payments() {
 
                 <svg
                   className="pay-summary-icon"
-                  width="100"
-                  height="130"
                   viewBox="0 0 100 130"
                   aria-hidden="true"
                 >
@@ -232,8 +230,6 @@ export default function Payments() {
 
                 <svg
                   className="pay-summary-icon"
-                  width="116"
-                  height="130"
                   viewBox="0 0 116 130"
                   aria-hidden="true"
                 >

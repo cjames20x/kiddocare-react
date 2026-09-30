@@ -2,12 +2,11 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Baby, ClipboardList, Syringe,
-  Search, Plus, Users, Calendar, Check,
+  Bell, Search, Plus, Users, Calendar, Check,
   X, AlertTriangle, ShieldCheck,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import DashboardSidebar from '../components/DashboardSidebar.jsx'
-import NotificationButton from '../components/NotificationButton.jsx'
 
 function calcAge(dob) {
   if (!dob) return '—'
@@ -437,7 +436,10 @@ export default function Dashboard() {
         {/* Topbar */}
         <div className="dash-topbar">
           <h1 className="dash-title">{activeTab.toUpperCase()}</h1>
-          <NotificationButton />
+          <div className="dash-bell">
+            <Bell size={20} />
+            <span className="dash-bell-dot"></span>
+          </div>
         </div>
 
         {/* Quick Stat Cards (Hidden on Book Appointments and Register Child) */}
