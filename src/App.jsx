@@ -10,6 +10,8 @@ import Help from './pages/Help.jsx'
 import Vaccinations from './pages/Vaccinations.jsx'
 import Payments from './pages/Payments.jsx'
 import UserDashboard from "./pages/UserDashboard";
+import AdminLogin from './pages/AdminLogin.jsx'
+import AdminDashboard from './pages/AdminDashboard.jsx'
 
 export default function App() {
   return (
@@ -25,6 +27,8 @@ export default function App() {
       <Route path="/vaccinations" element={<Vaccinations />} />
       <Route path="/payments" element={<Payments />} />
       <Route path="/user-dashboard" element={<UserDashboard />}/>
+      <Route path="/admin" element={<AdminLogin />} />
+      <Route path="/admin-dashboard" element={<AdminDashboard />} />
     </Routes>
   )
 }
