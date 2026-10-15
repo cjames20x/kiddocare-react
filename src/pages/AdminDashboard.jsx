@@ -53,6 +53,10 @@ const INIT_PRESCRIPTIONS = [
   { id:'RX-003', patient:'Sofia Andrade', medication:'Salbutamol Inhaler', dosage:'2 puffs every 4-6 hrs',doctor:'Dra. Maury V. Reyes',      date:'2025-09-10' },
 ]
 
+function initials(name = '') {
+  return name.split(' ').filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('')
+}
+
 function fmt(d) {
   if (!d) return '—'
   const dt = new Date(d + 'T00:00:00')
@@ -178,7 +182,7 @@ function GenderToggle({ value, onChange }) {
         <div key={g}
           className={`adm-gender-opt${value===g?' sel':''}`}
           onClick={()=>onChange(g)}>
-          <span style={{fontSize:20}}>{g==='Male'?'♂':'♀'}</span>{g}
+          {g}
         </div>
       ))}
     </div>
@@ -266,14 +270,19 @@ function SectionDashboard({ patients, onNavigate }) {
       {viewP && <Overlay onClose={()=>setViewP(null)}>
         <ModalHdr title="View Information" onClose={()=>setViewP(null)}/>
         <div className="adm-modal-body">
-          <Field label="Patient ID:"><RO val={viewP.id}/></Field>
-          <Field label="Patient Name:"><RO val={viewP.name}/></Field>
-          <div className="adm-field-row">
-            <Field label="Age:"><RO val={viewP.age}/></Field>
-            <Field label="Gender"><GenderToggle value={viewP.gender} onChange={()=>{}}/></Field>
+          <div className="adm-hero">
+            <div className="adm-avatar">{initials(viewP.name)}</div>
+            <div>
+              <div className="adm-hero-name">{viewP.name}</div>
+              <div className="adm-hero-id">{viewP.id}</div>
+            </div>
           </div>
-          <Field label="Next Visit:"><RO val={viewP.nextVisit}/></Field>
-          <Field label="Patient's Guardian:"><RO val={viewP.guardian}/></Field>
+          <div className="adm-grid">
+            <Field label="Age:"><RO val={viewP.age}/></Field>
+            <Field label="Gender"><RO val={viewP.gender}/></Field>
+            <Field label="Next Visit:"><RO val={fmt(viewP.nextVisit)}/></Field>
+            <Field label="Patient's Guardian:"><RO val={viewP.guardian}/></Field>
+          </div>
         </div>
       </Overlay>}
 
@@ -437,14 +446,19 @@ function SectionPatientMgmt() {
       </Overlay>}
       {viewP && <Overlay onClose={()=>setViewP(null)}><ModalHdr title="View Patient" onClose={()=>setViewP(null)}/>
         <div className="adm-modal-body">
-          <Field label="Patient ID:"><RO val={viewP.id}/></Field>
-          <Field label="Name:"><RO val={viewP.name}/></Field>
-          <div className="adm-field-row">
-            <Field label="Age:"><RO val={viewP.age}/></Field>
-            <Field label="Gender"><GenderToggle value={viewP.gender} onChange={()=>{}}/></Field>
+          <div className="adm-hero">
+            <div className="adm-avatar">{initials(viewP.name)}</div>
+            <div>
+              <div className="adm-hero-name">{viewP.name}</div>
+              <div className="adm-hero-id">{viewP.id}</div>
+            </div>
           </div>
-          <Field label="Next Visit:"><RO val={viewP.nextVisit}/></Field>
-          <Field label="Guardian:"><RO val={viewP.guardian}/></Field>
+          <div className="adm-grid">
+            <Field label="Age:"><RO val={viewP.age}/></Field>
+            <Field label="Gender"><RO val={viewP.gender}/></Field>
+            <Field label="Next Visit:"><RO val={fmt(viewP.nextVisit)}/></Field>
+            <Field label="Guardian:"><RO val={viewP.guardian}/></Field>
+          </div>
         </div>
       </Overlay>}
       {editP && <Overlay onClose={()=>setEditP(null)}><ModalHdr title="Edit Patient" onClose={()=>setEditP(null)}/>
@@ -868,33 +882,44 @@ export default function AdminDashboard() {
         .adm-btn-delete{background:none;border:none;cursor:pointer;color:#dc2626;padding:2px}
         .adm-btn-view:hover,.adm-btn-edit:hover{color:#0e4080}
         .adm-btn-delete:hover{color:#b91c1c}
-        .adm-overlay{position:fixed;inset:0;background:rgba(10,20,40,.5);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px}
-        .adm-modal{background:#fff;border-radius:14px;width:100%;max-width:470px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 50px rgba(0,0,0,.3);animation:admPop .16s ease-out}
+        .adm-overlay{position:fixed;inset:0;background:rgba(15,30,60,.45);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px}
+        .adm-modal{background:#fff;border-radius:18px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;box-shadow:0 30px 70px rgba(10,30,70,.35);animation:admPop .16s ease-out}
         @keyframes admPop{from{transform:scale(.94);opacity:0}to{transform:scale(1);opacity:1}}
-        .adm-modal-hdr{background:#1e4d8c;color:#fff;padding:16px 22px;display:flex;align-items:center;justify-content:space-between;font-size:16px;font-weight:700;position:sticky;top:0;z-index:1}
-        .adm-modal-close{background:none;border:none;color:#fff;cursor:pointer;display:flex;align-items:center}
-        .adm-modal-body{padding:24px 24px 20px}
-        .adm-field{margin-bottom:14px}
-        .adm-field label{display:block;font-size:13px;font-weight:700;color:#1c5d99;margin-bottom:5px}
-        .adm-field-row{display:flex;gap:12px}
-        .adm-field-row .adm-field{flex:1}
-        .adm-inp{width:100%;border:1.5px solid #d1d5db;border-radius:8px;padding:10px 12px;font-size:13px;color:#374151;outline:none;box-sizing:border-box;background:#f8f9fb}
-        .adm-inp:focus{border-color:#1c5d99;background:#fff}
-        .adm-ro{background:#f0f2f6;border:1.5px solid #e2e8f0;border-radius:8px;padding:10px 12px;font-size:13px;color:#374151}
-        .adm-gender-row{display:flex;gap:12px}
-        .adm-gender-opt{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;border:1.5px solid #d1d5db;border-radius:10px;padding:10px 8px;cursor:pointer;font-size:12.5px;font-weight:600;color:#6b7280;background:#f8f9fb;transition:.15s;user-select:none}
-        .adm-gender-opt.sel{border-color:#1c5d99;background:#eff6ff;color:#1c5d99}
-        .adm-submit{width:100%;padding:12px;border:none;border-radius:10px;background:#1e4d8c;color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-top:6px}
+        .adm-modal-hdr{background:linear-gradient(135deg,#1e4d8c 0%,#2a64ad 100%);color:#fff;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;font-size:17px;font-weight:700;letter-spacing:.2px;position:sticky;top:0;z-index:1}
+        .adm-modal-close{width:34px;height:34px;border:none;border-radius:50%;background:rgba(255,255,255,.16);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s}
+        .adm-modal-close:hover{background:rgba(255,255,255,.28)}
+        .adm-modal-body{padding:24px 26px 26px}
+        .adm-field{margin-bottom:18px}
+        .adm-field label{display:block;font-size:12.5px;font-weight:700;color:#1c5d99;margin-bottom:7px;letter-spacing:.15px}
+        .adm-field-row{display:flex;gap:16px;align-items:flex-start}
+        .adm-field-row .adm-field{flex:1;min-width:0}
+        .adm-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 22px}
+        .adm-hero{display:flex;align-items:center;gap:16px;padding:16px 18px;margin-bottom:22px;border-radius:14px;background:linear-gradient(135deg,#eaf2fc 0%,#f5f9fe 100%);border:1px solid #d9e7f7}
+        .adm-avatar{width:54px;height:54px;flex-shrink:0;border-radius:50%;background:linear-gradient(135deg,#2a64ad,#1e4d8c);color:#fff;font-size:18px;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 14px rgba(30,77,140,.28)}
+        .adm-hero-name{font-size:16px;font-weight:700;color:#14365f;line-height:1.25}
+        .adm-hero-id{display:inline-block;margin-top:6px;font-size:11px;font-weight:700;letter-spacing:.4px;color:#1c5d99;background:#fff;border:1px solid #cfe0f4;border-radius:20px;padding:2px 10px}
+        .adm-inp{width:100%;height:42px;border:1px solid #d3deeb;border-radius:9px;padding:0 13px;font-size:14px;font-family:inherit;color:#1f2937;outline:none;box-sizing:border-box;background:#fff;transition:border-color .15s,box-shadow .15s}
+        .adm-inp::placeholder{color:#9aa8ba}
+        .adm-inp:hover{border-color:#b4c7de}
+        .adm-inp:focus{border-color:#1c5d99;box-shadow:0 0 0 3px rgba(28,93,153,.14)}
+        .adm-ro{display:flex;align-items:center;min-height:38px;box-sizing:border-box;padding:0 0 9px;border-bottom:1px solid #dfe8f3;font-size:14.5px;font-weight:600;color:#1f2937}
+        .adm-gender-row{display:flex;gap:4px;height:42px;box-sizing:border-box;padding:4px;background:#eef4fb;border-radius:11px}
+        .adm-gender-opt{flex:1;display:flex;align-items:center;justify-content:center;border-radius:8px;font-size:13.5px;font-weight:600;color:#5f7896;cursor:pointer;transition:background .15s,color .15s,box-shadow .15s;user-select:none}
+        .adm-gender-opt:hover{color:#1e4d8c}
+        .adm-gender-opt.sel{background:#fff;color:#1e4d8c;box-shadow:0 2px 6px rgba(30,77,140,.16)}
+        .adm-submit{width:100%;height:46px;padding:0;border:none;border-radius:10px;background:linear-gradient(135deg,#2a64ad,#1e4d8c);color:#fff;font-size:14.5px;font-weight:700;letter-spacing:.3px;cursor:pointer;margin-top:12px;box-shadow:0 6px 16px rgba(30,77,140,.25);transition:filter .15s}
         .adm-submit:hover{filter:brightness(.92)}
         .adm-del-body{text-align:center;padding:28px 24px 22px}
         .adm-del-icon{width:72px;height:72px;border-radius:50%;border:3px solid #7b1717;display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
         .adm-del-title{font-size:18px;font-weight:800;color:#7b1717;margin-bottom:8px}
         .adm-del-sub{font-size:13px;color:#6b7280;margin-bottom:22px}
         .adm-del-btns{display:flex;gap:12px;justify-content:center}
-        .adm-btn-cancel{flex:1;max-width:160px;padding:12px;border:none;border-radius:10px;background:#1e4d8c;color:#fff;font-size:14px;font-weight:700;cursor:pointer}
-        .adm-btn-confirm{flex:1;max-width:160px;padding:12px;border:none;border-radius:10px;background:#c0392b;color:#fff;font-size:14px;font-weight:700;cursor:pointer}
-        .adm-btn-cancel:hover{filter:brightness(.9)}
-        .adm-btn-confirm:hover{filter:brightness(.9)}
+        .adm-btn-cancel{flex:1;max-width:160px;padding:12px;border:1.5px solid #d1d5db;border-radius:8px;background:#fff;color:#374151;font-size:14px;font-weight:700;cursor:pointer;transition:background .15s}
+        .adm-btn-confirm{flex:1;max-width:160px;padding:12px;border:none;border-radius:8px;background:#c0392b;color:#fff;font-size:14px;font-weight:700;cursor:pointer}
+        .adm-btn-primary{flex:1;max-width:160px;padding:12px;border:none;border-radius:8px;background:#1e4d8c;color:#fff;font-size:14px;font-weight:700;cursor:pointer}
+        .adm-btn-cancel:hover{background:#f3f4f6}
+        .adm-btn-confirm:hover,.adm-btn-primary:hover{filter:brightness(.92)}
+        .adm-confirm-title{font-size:18px;font-weight:800;color:#1e4d8c;margin-bottom:8px}
         @media(max-width:900px){.kcc-cards{grid-template-columns:1fr}}
       `}</style>
 
