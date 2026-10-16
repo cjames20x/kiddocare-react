@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Users, Calendar, CreditCard, Search, Plus, Eye, Pencil, Trash2, X, AlertCircle,
-  ClipboardList, Syringe, FileText, BarChart2, Check
+  ClipboardList, Syringe, FileText, BarChart2, Check,
+  ArrowLeft, HeartPulse, Thermometer, Wind
 } from 'lucide-react'
 import AdminSidebar from '../components/AdminSidebar.jsx'
 
@@ -481,11 +482,191 @@ function SectionPatientMgmt() {
   )
 }
 
-function SectionMedicalRecords() {
+// Clinical details the app does not store yet. Sample values only; replace with backend data.
+const SAMPLE_MED = {
+  'KC-001': {
+    vitals: { hr: 92, temp: '37.2', rr: 20 },
+    allergies: 'None', chronic: 'None',
+    past: ['Common Cold (2024)', 'Mild Fever (2025)'],
+    blood: 'O+ (Positive)', height: '110 cm', weight: '14.5 kg',
+    notes: 'Patient is stable. Symptoms consistent with viral upper respiratory infection. Advised rest, fluids, and medication compliance. Follow-up if symptoms persist beyond 5 days.',
+  },
+  'KC-002': {
+    vitals: { hr: 98, temp: '36.8', rr: 22 },
+    allergies: 'None', chronic: 'None',
+    past: ['Acute Otitis Media (2024)'],
+    blood: 'A+ (Positive)', height: '96 cm', weight: '14.0 kg',
+    notes: 'Routine vaccination visit. No adverse reactions observed. Next dose as scheduled.',
+  },
+  'KC-003': {
+    vitals: { hr: 104, temp: '36.9', rr: 24 },
+    allergies: 'None', chronic: 'None',
+    past: ['Acute Gastroenteritis (2025)'],
+    blood: 'B+ (Positive)', height: '76 cm', weight: '9.5 kg',
+    notes: 'Routine checkup. Growth and development within normal range. Varicella vaccine still pending.',
+  },
+  'KC-004': {
+    vitals: { hr: 88, temp: '37.0', rr: 20 },
+    allergies: 'None', chronic: 'None',
+    past: ['Acute Bronchitis (2025)'],
+    blood: 'O- (Negative)', height: '110 cm', weight: '18.0 kg',
+    notes: 'Bronchitis follow-up. Continue inhaler as prescribed; return if wheezing or fever persists.',
+  },
+  'KC-005': {
+    vitals: { hr: 96, temp: '36.7', rr: 21 },
+    allergies: 'None', chronic: 'None',
+    past: [],
+    blood: 'A- (Negative)', height: '96 cm', weight: '14.2 kg',
+    notes: 'No clinical notes recorded yet.',
+  },
+  'KC-006': {
+    vitals: { hr: 100, temp: '36.6', rr: 22 },
+    allergies: 'None', chronic: 'None',
+    past: [],
+    blood: 'AB+ (Positive)', height: '86 cm', weight: '12.1 kg',
+    notes: 'No clinical notes recorded yet.',
+  },
+}
+const SAMPLE_EMPTY = {
+  vitals: { hr: '—', temp: '—', rr: '—' },
+  allergies: '—', chronic: '—', past: [],
+  blood: '—', height: '—', weight: '—',
+  notes: 'No clinical notes recorded yet.',
+}
+
+function VitalCard({ icon: Icon, label, value, unit }) {
+  return (
+    <div className="mh-vital">
+      <Icon size={30} className="mh-vital-icon" />
+      <div className="mh-vital-label">{label}</div>
+      <div className="mh-vital-value">{value}<small>{unit}</small></div>
+    </div>
+  )
+}
+
+function InfoRow({ label, value }) {
+  return <div className="mh-info-row"><span>{label}</span><span>{value}</span></div>
+}
+
+function MedicalHistory({ name, records, onBack }) {
+  const base = INIT_PATIENTS.find(p => p.name === name) ||
+    { id: '—', name, age: '—', gender: '—', nextVisit: '', guardian: '—' }
+  const med  = SAMPLE_MED[base.id] || SAMPLE_EMPTY
+  const rx   = INIT_PRESCRIPTIONS.filter(r => r.patient === base.name)
+  const vx   = INIT_VACC.filter(v => v.patient === base.name)
+  const last = records
+    .filter(r => r.patient === base.name)
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0]
+
+  return (
+    <>
+      <button className="mh-back" onClick={onBack}>
+        <ArrowLeft size={16} /> Back to Medical Records
+      </button>
+
+      <div className="mh-layout">
+        <div className="mh-col">
+          <div className="mh-card mh-profile">
+            <div className="mh-avatar">{initials(base.name)}</div>
+            <div className="mh-name">{base.name}</div>
+            <div className="mh-age">Age: {base.age}</div>
+          </div>
+
+          <div className="mh-card">
+            <div className="mh-card-title">Information</div>
+            <InfoRow label="Patient ID" value={base.id} />
+            <InfoRow label="Name" value={base.name} />
+            <InfoRow label="Age" value={base.age} />
+            <InfoRow label="Gender" value={base.gender} />
+            <InfoRow label="Guardian" value={base.guardian} />
+            <InfoRow label="Blood Type" value={med.blood} />
+            <InfoRow label="Height" value={med.height} />
+            <InfoRow label="Weight" value={med.weight} />
+          </div>
+        </div>
+
+        <div className="mh-col">
+          <div className="mh-vitals">
+            <VitalCard icon={HeartPulse} label="Heart Rate" value={med.vitals.hr} unit="bpm" />
+            <VitalCard icon={Thermometer} label="Temperature" value={med.vitals.temp} unit="°C" />
+            <VitalCard icon={Wind} label="Respiratory Rate" value={med.vitals.rr} unit="breaths/min" />
+          </div>
+
+          <div className="mh-card">
+            <div className="mh-card-title">Medical Information</div>
+            <div className="mh-med-grid">
+              <div>
+                <div className="mh-med-label">Allergy</div>
+                <div className="mh-med-value">{med.allergies}</div>
+              </div>
+              <div>
+                <div className="mh-med-label">Chronic Illness</div>
+                <div className="mh-med-value">{med.chronic}</div>
+              </div>
+              <div>
+                <div className="mh-med-label">Past Illnesses</div>
+                {med.past.length
+                  ? <ul className="mh-list">{med.past.map(p => <li key={p}>{p}</li>)}</ul>
+                  : <div className="mh-med-value">None</div>}
+              </div>
+            </div>
+          </div>
+
+          <div className="mh-card">
+            <div className="mh-card-title">Prescriptions</div>
+            {rx.length ? (
+              <div className="adm-table-wrap">
+                <table className="adm-table">
+                  <thead><tr><th>Medication</th><th>Instructions</th><th>Date</th></tr></thead>
+                  <tbody>
+                    {rx.map(r => (
+                      <tr key={r.id}><td>{r.medication}</td><td>{r.dosage}</td><td>{fmt(r.date)}</td></tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : <div className="mh-empty">No prescriptions on file.</div>}
+          </div>
+
+          <div className="mh-two">
+            <div className="mh-card">
+              <div className="mh-card-title">Immunization History</div>
+              {vx.length ? (
+                <ul className="mh-list">
+                  {vx.map(v => (
+                    <li key={v.id}>{v.vaccine}: {v.status} <span className="mh-sub">({fmt(v.date)})</span></li>
+                  ))}
+                </ul>
+              ) : <div className="mh-empty">No immunizations recorded.</div>}
+            </div>
+
+            <div className="mh-card">
+              <div className="mh-card-title">Last Visit</div>
+              {last ? (
+                <ul className="mh-list">
+                  <li>Diagnosis: {last.diagnosis}</li>
+                  <li>Visit date: {fmt(last.date)}</li>
+                  <li>Doctor: {last.doctor}</li>
+                </ul>
+              ) : <div className="mh-empty">No visits recorded yet.</div>}
+              <div className="mh-next"><strong>Next visit:</strong> {fmt(base.nextVisit)}</div>
+            </div>
+          </div>
+
+          <div className="mh-card">
+            <div className="mh-card-title">Notes (Doctor)</div>
+            <div className="mh-note">{med.notes}</div>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+function SectionMedicalRecords({ historyName, onOpenHistory, onCloseHistory }) {
   const [rows, setRows]     = useState(INIT_RECORDS)
   const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
-  const [viewR,   setViewR]   = useState(null)
   const [deleteR, setDeleteR] = useState(null)
   const [addF, setAddF]= useState({ patient:'', date:'', diagnosis:'', doctor:'' })
 
@@ -493,6 +674,8 @@ function SectionMedicalRecords() {
 
   function doAdd(e) { e.preventDefault(); setRows([...rows,{id:`MR-${String(rows.length+1).padStart(3,'0')}`, ...addF}]); setAddF({patient:'',date:'',diagnosis:'',doctor:''}); setShowAdd(false) }
   function doDelete() { setRows(rows.filter(r=>r.id!==deleteR.id)); setDeleteR(null) }
+
+  if (historyName) return <MedicalHistory name={historyName} records={rows} onBack={onCloseHistory}/>
 
   return (
     <>
@@ -506,7 +689,7 @@ function SectionMedicalRecords() {
                 <tr key={r.id}>
                   <td>{r.id}</td><td>{r.patient}</td><td>{fmt(r.date)}</td><td>{r.diagnosis}</td><td>{r.doctor}</td>
                   <td><div className="adm-actions">
-                    <button className="adm-btn-view" onClick={()=>setViewR(r)}><Eye size={17}/></button>
+                    <button className="adm-btn-view" title="View medical history" onClick={()=>onOpenHistory(r.patient)}><Eye size={17}/></button>
                     <button className="adm-btn-delete" onClick={()=>setDeleteR(r)}><Trash2 size={16}/></button>
                   </div></td>
                 </tr>
@@ -523,15 +706,6 @@ function SectionMedicalRecords() {
           <Field label="Doctor:"><Inp value={addF.doctor} placeholder="Attending doctor" onChange={e=>setAddF({...addF,doctor:e.target.value})}/></Field>
           <SubmitBtn label="Add Record"/>
         </form></div>
-      </Overlay>}
-      {viewR && <Overlay onClose={()=>setViewR(null)}><ModalHdr title="Medical Record" onClose={()=>setViewR(null)}/>
-        <div className="adm-modal-body">
-          <Field label="Record ID:"><RO val={viewR.id}/></Field>
-          <Field label="Patient:"><RO val={viewR.patient}/></Field>
-          <Field label="Date:"><RO val={fmt(viewR.date)}/></Field>
-          <Field label="Diagnosis:"><RO val={viewR.diagnosis}/></Field>
-          <Field label="Doctor:"><RO val={viewR.doctor}/></Field>
-        </div>
       </Overlay>}
       {deleteR && <Overlay onClose={()=>setDeleteR(null)}><ModalHdr title="Delete Record" onClose={()=>setDeleteR(null)}/>
         <DeleteConfirm onCancel={()=>setDeleteR(null)} onDelete={doDelete}/>
@@ -841,13 +1015,18 @@ export default function AdminDashboard() {
   const location = useLocation()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'Dashboard')
+  const [historyName, setHistoryName] = useState(null)
 
   useEffect(() => {
-    if (location.state?.activeTab) setActiveTab(location.state.activeTab)
+    if (location.state?.activeTab) {
+      setActiveTab(location.state.activeTab)
+      setHistoryName(null)
+    }
   }, [location.key])
 
   function handleNavigate(tab) {
     setActiveTab(tab)
+    setHistoryName(null)
     navigate('/admin-dashboard', { state: { activeTab: tab } })
   }
 
@@ -920,6 +1099,37 @@ export default function AdminDashboard() {
         .adm-btn-cancel:hover{background:#f3f4f6}
         .adm-btn-confirm:hover,.adm-btn-primary:hover{filter:brightness(.92)}
         .adm-confirm-title{font-size:18px;font-weight:800;color:#1e4d8c;margin-bottom:8px}
+        .mh-back{display:inline-flex;align-items:center;gap:8px;background:none;border:none;padding:0;margin:0 0 22px;color:#1c5d99;font-size:14px;font-weight:700;cursor:pointer}
+        .mh-back:hover{color:#0e4080;text-decoration:underline}
+        .mh-layout{display:grid;grid-template-columns:300px minmax(0,1fr);gap:24px;align-items:start}
+        .mh-col{display:flex;flex-direction:column;gap:24px;min-width:0}
+        .mh-card{background:#fff;border-radius:14px;padding:24px;box-shadow:0 2px 12px rgba(0,0,0,.07)}
+        .mh-card-title{display:flex;align-items:center;gap:8px;font-size:16px;font-weight:700;color:#1c5d99;margin-bottom:16px}
+        .mh-profile{text-align:center;padding:30px 24px}
+        .mh-avatar{width:120px;height:120px;margin:0 auto 16px;border-radius:50%;background:linear-gradient(135deg,#2a64ad,#1e4d8c);color:#fff;font-size:36px;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px rgba(30,77,140,.28)}
+        .mh-name{font-size:19px;font-weight:800;color:#14365f}
+        .mh-age{font-size:14px;color:#5f7896;margin-top:4px}
+        .mh-info-row{display:flex;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid #eef2f7;font-size:14px}
+        .mh-info-row:last-child{border-bottom:none}
+        .mh-info-row span:first-child{color:#5f7896;font-weight:600}
+        .mh-info-row span:last-child{color:#1f2937;font-weight:600;text-align:right}
+        .mh-vitals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+        .mh-vital{background:#fff;border-radius:14px;padding:22px 16px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.07)}
+        .mh-vital-icon{color:#1c5d99}
+        .mh-vital-label{margin-top:10px;font-size:13.5px;font-weight:700;color:#1c5d99}
+        .mh-vital-value{margin-top:6px;font-size:28px;font-weight:800;color:#14365f;line-height:1.1}
+        .mh-vital-value small{font-size:12px;font-weight:600;color:#5f7896;margin-left:4px}
+        .mh-med-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+        .mh-med-label{font-size:12.5px;font-weight:700;color:#1c5d99;margin-bottom:6px}
+        .mh-med-value{font-size:15px;font-weight:600;color:#1f2937}
+        .mh-list{margin:0;padding-left:18px;font-size:13.5px;color:#374151;line-height:1.75}
+        .mh-sub{color:#8a97a8;font-size:12px}
+        .mh-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}
+        .mh-next{margin-top:14px;padding-top:12px;border-top:1px solid #eef2f7;font-size:13.5px;color:#374151}
+        .mh-empty{font-size:13px;color:#8a97a8;font-style:italic}
+        .mh-note{border-left:4px solid #f2788d;background:#fdf3f5;border-radius:8px;padding:14px 18px;font-size:14px;line-height:1.7;color:#374151}
+        @media(max-width:1100px){.mh-layout{grid-template-columns:1fr}}
+        @media(max-width:700px){.mh-vitals,.mh-med-grid,.mh-two{grid-template-columns:1fr}}
         @media(max-width:900px){.kcc-cards{grid-template-columns:1fr}}
       `}</style>
 
@@ -927,13 +1137,13 @@ export default function AdminDashboard() {
 
       <main className="dash-main">
         <div className="dash-topbar">
-          <h1 className="dash-title">{activeTab.toUpperCase()}</h1>
+          <h1 className="dash-title">{historyName && activeTab === 'Medical Records' ? 'MEDICAL HISTORY' : activeTab.toUpperCase()}</h1>
         </div>
 
         {activeTab === 'Dashboard'         && <SectionDashboard patients={INIT_PATIENTS} onNavigate={handleNavigate}/>}
         {activeTab === 'User Management'   && <SectionUserMgmt/>}
         {activeTab === 'Patient Management'&& <SectionPatientMgmt/>}
-        {activeTab === 'Medical Records'   && <SectionMedicalRecords/>}
+        {activeTab === 'Medical Records'   && <SectionMedicalRecords historyName={historyName} onOpenHistory={setHistoryName} onCloseHistory={() => setHistoryName(null)}/>}
         {activeTab === 'Appointments'      && <SectionAppointments/>}
         {activeTab === 'Vaccinations'      && <SectionVaccinations/>}
         {activeTab === 'Payments'          && <SectionPayments/>}
