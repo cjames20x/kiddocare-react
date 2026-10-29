@@ -5,6 +5,22 @@ import {
   ClipboardList, Syringe, FileText, BarChart2, Check
 } from 'lucide-react'
 import AdminSidebar from '../components/AdminSidebar.jsx'
+import { useAuth } from '../context/AuthContext.jsx'
+import {
+  listAppointments,
+  getAppointment,
+  checkAvailability,
+  createAppointment,
+  updateAppointmentStatus,
+  rescheduleAppointment,
+  listDoctors,
+  listMyPatients,
+} from '../lib/api.js'
+import {
+  Clock, RefreshCw, Filter, CheckCircle2
+} from 'lucide-react'
+
+const DEMO_ADMIN_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiZjUwMDIxOTctNzY2Ny00M2Q1LWJiZDMtOTY4OTQ2MmM5YjdhIiwidXNlcm5hbWUiOiJhZG1pbiIsInJvbGUiOiJhZG1pbiIsImVtYWlsIjoiYWRtaW5AZ21haWwuY29tIiwiaWF0IjoxNzkzMjk2NDc3LCJleHAiOjE3OTU4ODg0Nzd9.ryCi963Ho7PRHqfvhXiDWLlXcU3zqszFZVdZX-RzrZQ'
 
 const INIT_PATIENTS = [
   { id:'KC-001', name:'Lhea Santos',   age:'2 years', gender:'Female', nextVisit:'2025-11-11', guardian:'Emma Santos'     },
@@ -86,6 +102,7 @@ function StatusBadge({ status }) {
   const colors = {
     Active:'#d1fae5|#065f46', Paid:'#d1fae5|#065f46', Completed:'#d1fae5|#065f46',
     Pending:'#fef3c7|#92400e', Confirmed:'#dbeafe|#1d4ed8', Inactive:'#fee2e2|#b91c1c',
+    Cancelled:'#fee2e2|#b91c1c',
   }
   const [bg, color] = (colors[status] || '#f1f5f9|#374151').split('|')
   return <span style={{ background: bg, color, borderRadius:20, padding:'3px 12px', fontSize:12, fontWeight:700 }}>{status}</span>
@@ -191,7 +208,33 @@ function SectionDashboard({ patients, onNavigate }) {
   const [viewP,   setViewP]         = useState(null)
   const [editP,   setEditP]         = useState(null)
   const [deleteP, setDeleteP]       = useState(null)
+  const { accessToken } = useAuth()
+  const token = accessToken || localStorage.getItem('kiddocare-token') || DEMO_ADMIN_TOKEN
   const [rows, setRows]             = useState(patients)
+  const [liveApptCount, setLiveApptCount] = useState(0)
+
+  useEffect(() => {
+    async function fetchCounts() {
+      try {
+        const [appts, pats] = await Promise.all([
+          listAppointments(token).catch(() => []),
+          listMyPatients(token).catch(() => []),
+        ])
+        if (Array.isArray(appts)) setLiveApptCount(appts.length)
+        if (Array.isArray(pats) && pats.length > 0) {
+          setRows(pats.map(p => ({
+            id: `KC-${String(p.id).padStart(3, '0')}`,
+            name: p.patient_name,
+            age: p.date_of_birth || 'N/A',
+            gender: p.gender ? p.gender[0].toUpperCase() + p.gender.slice(1) : 'Male',
+            nextVisit: '—',
+            guardian: 'Registered Guardian',
+          })))
+        }
+      } catch (e) {}
+    }
+    fetchCounts()
+  }, [token])
 
   const [addF, setAddF] = useState({ name:'', age:'', gender:'Male', nextVisit:'', guardian:'' })
   const [editF, setEditF] = useState({ name:'', age:'', gender:'Male', nextVisit:'', guardian:'' })
@@ -219,7 +262,7 @@ function SectionDashboard({ patients, onNavigate }) {
     <>
       <div className="kcc-cards">
         <StatCard num={rows.length} label="Patients" icon="child" onClick={()=>onNavigate('Patient Management')} />
-        <StatCard num={5} label="Appointments" icon="calendar" onClick={()=>onNavigate('Appointments')} />
+        <StatCard num={liveApptCount} label="Appointments" icon="calendar" onClick={()=>onNavigate('Appointments')} />
         <StatCard num={6} label="Pending Payments" icon="payment" onClick={()=>onNavigate('Payments')} />
       </div>
 
@@ -526,80 +569,1025 @@ function SectionMedicalRecords() {
   )
 }
 
+const STANDARD_TIME_SLOTS = [
+  '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
+  '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00'
+];
+
+function formatTimeDisplay(t) {
+  if (!t) return '—';
+  const match = String(t).match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return t;
+  let h = parseInt(match[1], 10);
+  const m = match[2];
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${String(h).padStart(2, '0')}:${m} ${ampm}`;
+}
+
 function SectionAppointments() {
-  const [rows, setRows]     = useState(INIT_APPTS)
-  const [search, setSearch] = useState('')
-  const [showAdd, setShowAdd] = useState(false)
-  const [viewA,   setViewA]   = useState(null)
-  const [deleteA, setDeleteA] = useState(null)
-  const [addF, setAddF] = useState({ patient:'', date:'', time:'09:00 AM', service:'General Checkup', doctor:'', status:'Confirmed' })
+  const { accessToken } = useAuth();
+  const token = accessToken || localStorage.getItem('kiddocare-token') || DEMO_ADMIN_TOKEN;
 
-  const filtered = rows.filter(r=>r.patient.toLowerCase().includes(search.toLowerCase()))
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
 
-  function doAdd(e) { e.preventDefault(); setRows([...rows,{id:`AP-${String(rows.length+1).padStart(3,'0')}`, ...addF}]); setAddF({patient:'',date:'',time:'09:00 AM',service:'General Checkup',doctor:'',status:'Confirmed'}); setShowAdd(false) }
-  function doDelete() { setRows(rows.filter(r=>r.id!==deleteA.id)); setDeleteA(null) }
+  const [doctors, setDoctors] = useState([]);
+  const [patients, setPatients] = useState([]);
+
+  // Filter States
+  const [search, setSearch] = useState('');
+  const [filterDoctor, setFilterDoctor] = useState('');
+  const [filterPatient, setFilterPatient] = useState('');
+  const [filterStatus, setFilterStatus] = useState('All');
+  const [dateMode, setDateMode] = useState('single'); // 'single' or 'range'
+  const [filterDate, setFilterDate] = useState('');
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
+
+  // Modals
+  const [showAdd, setShowAdd] = useState(false);
+  const [viewA, setViewA] = useState(null);
+  const [loadingView, setLoadingView] = useState(false);
+  const [rescheduleA, setRescheduleA] = useState(null);
+  const [cancelA, setCancelA] = useState(null);
+
+  // Add Appointment Form State
+  const [addF, setAddF] = useState({
+    patient_id: '',
+    doctor_id: '',
+    appointment_date: '',
+    appointment_time: '',
+    reason_for_visit: 'Pediatric Consultation',
+    bookedSlots: [],
+    checkingSlots: false,
+  });
+
+  // Reschedule Form State
+  const [rescheduleF, setRescheduleF] = useState({
+    doctor_id: '',
+    appointment_date: '',
+    appointment_time: '',
+    bookedSlots: [],
+    checkingSlots: false,
+  });
+
+  // Notice auto-dismiss
+  useEffect(() => {
+    if (notice) {
+      const timer = setTimeout(() => setNotice(''), 4500);
+      return () => clearTimeout(timer);
+    }
+  }, [notice]);
+
+  // Load doctors & patients list
+  useEffect(() => {
+    async function loadMeta() {
+      try {
+        const [docs, pats] = await Promise.all([
+          listDoctors(token).catch(() => []),
+          listMyPatients(token).catch(() => []),
+        ]);
+        if (Array.isArray(docs)) setDoctors(docs);
+        if (Array.isArray(pats)) setPatients(pats);
+      } catch (e) {
+        console.warn('Could not load metadata:', e);
+      }
+    }
+    loadMeta();
+  }, [token]);
+
+  // Main listAppointments query caller
+  async function loadAppointmentsList() {
+    setLoading(true);
+    setError('');
+    try {
+      const queryParams = {};
+      if (filterDoctor) queryParams.doctor_id = filterDoctor;
+      if (filterPatient) queryParams.patient_id = filterPatient;
+      if (filterStatus && filterStatus !== 'All') queryParams.status = filterStatus;
+
+      if (dateMode === 'single' && filterDate) {
+        queryParams.date = filterDate;
+      } else if (dateMode === 'range' && filterStartDate && filterEndDate) {
+        queryParams.start_date = filterStartDate;
+        queryParams.end_date = filterEndDate;
+      }
+
+      const data = await listAppointments(token, queryParams);
+      setRows(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setError(err.message || 'Could not load appointments.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Trigger load when filters change
+  useEffect(() => {
+    loadAppointmentsList();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterDoctor, filterPatient, filterStatus, dateMode, filterDate, filterStartDate, filterEndDate, token]);
+
+  // Availability Check for Booking Form
+  useEffect(() => {
+    if (!addF.doctor_id || !addF.appointment_date) {
+      setAddF(prev => ({ ...prev, bookedSlots: [] }));
+      return;
+    }
+    let active = true;
+    async function checkAddSlots() {
+      setAddF(prev => ({ ...prev, checkingSlots: true }));
+      try {
+        const res = await checkAvailability(addF.doctor_id, addF.appointment_date, token);
+        if (active) {
+          const booked = (res?.booked_times || []).map(t => String(t).slice(0, 5));
+          setAddF(prev => ({
+            ...prev,
+            bookedSlots: booked,
+            checkingSlots: false,
+            appointment_time: booked.includes(prev.appointment_time) ? '' : prev.appointment_time,
+          }));
+        }
+      } catch (err) {
+        if (active) setAddF(prev => ({ ...prev, checkingSlots: false, bookedSlots: [] }));
+      }
+    }
+    checkAddSlots();
+    return () => { active = false; };
+  }, [addF.doctor_id, addF.appointment_date, token]);
+
+  // Availability Check for Reschedule Form
+  useEffect(() => {
+    if (!rescheduleF.doctor_id || !rescheduleF.appointment_date) {
+      setRescheduleF(prev => ({ ...prev, bookedSlots: [] }));
+      return;
+    }
+    let active = true;
+    async function checkReschedSlots() {
+      setRescheduleF(prev => ({ ...prev, checkingSlots: true }));
+      try {
+        const res = await checkAvailability(rescheduleF.doctor_id, rescheduleF.appointment_date, token);
+        if (active) {
+          const booked = (res?.booked_times || []).map(t => String(t).slice(0, 5));
+          setRescheduleF(prev => ({
+            ...prev,
+            bookedSlots: booked,
+            checkingSlots: false,
+            appointment_time: booked.includes(prev.appointment_time) ? '' : prev.appointment_time,
+          }));
+        }
+      } catch (err) {
+        if (active) setRescheduleF(prev => ({ ...prev, checkingSlots: false, bookedSlots: [] }));
+      }
+    }
+    checkReschedSlots();
+    return () => { active = false; };
+  }, [rescheduleF.doctor_id, rescheduleF.appointment_date, token]);
+
+  // 1. CREATE APPOINTMENT
+  async function handleCreate(e) {
+    e.preventDefault();
+    if (!addF.patient_id || !addF.doctor_id || !addF.appointment_date || !addF.appointment_time) {
+      alert('Please fill out all required appointment fields.');
+      return;
+    }
+    try {
+      await createAppointment({
+        patient_id: Number(addF.patient_id),
+        doctor_id: Number(addF.doctor_id),
+        appointment_date: addF.appointment_date,
+        appointment_time: addF.appointment_time,
+        reason_for_visit: addF.reason_for_visit,
+      }, token);
+
+      setNotice('Appointment booked successfully!');
+      setShowAdd(false);
+      setAddF({
+        patient_id: '',
+        doctor_id: '',
+        appointment_date: '',
+        appointment_time: '',
+        reason_for_visit: 'Pediatric Consultation',
+        bookedSlots: [],
+        checkingSlots: false,
+      });
+      await loadAppointmentsList();
+    } catch (err) {
+      alert(err.message || 'Failed to book appointment.');
+    }
+  }
+
+  // 2. GET APPOINTMENT (Details Modal)
+  async function handleOpenView(appt) {
+    setLoadingView(true);
+    setViewA(appt);
+    try {
+      const full = await getAppointment(appt.id, token);
+      if (full) setViewA(full);
+    } catch (err) {
+      console.warn('Could not fetch single appointment details:', err);
+    } finally {
+      setLoadingView(false);
+    }
+  }
+
+  // 3. UPDATE APPOINTMENT STATUS
+  async function handleStatusUpdate(apptId, newStatus) {
+    try {
+      const updated = await updateAppointmentStatus(apptId, newStatus, token);
+      setRows(prev => prev.map(r => r.id === apptId ? { ...r, status: updated.status || newStatus } : r));
+      if (viewA && viewA.id === apptId) {
+        setViewA(prev => ({ ...prev, status: updated.status || newStatus }));
+      }
+      setNotice(`Appointment #${apptId} status updated to ${newStatus}`);
+    } catch (err) {
+      alert(err.message || 'Failed to update appointment status.');
+    }
+  }
+
+  // 4. RESCHEDULE APPOINTMENT
+  function handleOpenReschedule(appt) {
+    const timeClean = appt.appointment_time ? String(appt.appointment_time).slice(0, 5) : '09:00';
+    setRescheduleA(appt);
+    setRescheduleF({
+      doctor_id: String(appt.doctor_id || (doctors[0]?.id || 2)),
+      appointment_date: appt.appointment_date || '',
+      appointment_time: timeClean,
+      bookedSlots: [],
+      checkingSlots: false,
+    });
+  }
+
+  async function handleRescheduleSubmit(e) {
+    e.preventDefault();
+    if (!rescheduleF.appointment_date || !rescheduleF.appointment_time) {
+      alert('Please select both a date and an appointment time slot.');
+      return;
+    }
+    try {
+      await rescheduleAppointment(rescheduleA.id, {
+        doctor_id: Number(rescheduleF.doctor_id),
+        appointment_date: rescheduleF.appointment_date,
+        appointment_time: rescheduleF.appointment_time,
+      }, token);
+
+      setNotice(`Appointment #${rescheduleA.id} rescheduled successfully!`);
+      setRescheduleA(null);
+      await loadAppointmentsList();
+    } catch (err) {
+      alert(err.message || 'Failed to reschedule appointment.');
+    }
+  }
+
+  // 5. CANCEL APPOINTMENT
+  async function handleConfirmCancel() {
+    if (!cancelA) return;
+    try {
+      await updateAppointmentStatus(cancelA.id, 'Cancelled', token);
+      setRows(prev => prev.map(r => r.id === cancelA.id ? { ...r, status: 'Cancelled' } : r));
+      setNotice(`Appointment #${cancelA.id} has been cancelled.`);
+      setCancelA(null);
+    } catch (err) {
+      alert(err.message || 'Failed to cancel appointment.');
+    }
+  }
+
+  // Client search filter (by patient name or reason)
+  const filteredRows = rows.filter(r => {
+    const pName = (r.patient_name || '').toLowerCase();
+    const docName = (r.doctor_name || '').toLowerCase();
+    const reason = (r.reason_for_visit || '').toLowerCase();
+    const q = search.toLowerCase();
+    return pName.includes(q) || docName.includes(q) || reason.includes(q);
+  });
+
+  function clearAllFilters() {
+    setFilterDoctor('');
+    setFilterPatient('');
+    setFilterStatus('All');
+    setFilterDate('');
+    setFilterStartDate('');
+    setFilterEndDate('');
+    setSearch('');
+  }
 
   return (
     <>
       <div className="adm-panel">
-        <PanelHead icon={Calendar} title="Appointments" search={search} setSearch={setSearch} onAdd={()=>setShowAdd(true)}/>
+        <div className="adm-panel-head">
+          <div className="adm-panel-title">
+            <Calendar size={22} color="#1e4d8c" />
+            Appointments Management
+            <span style={{ fontSize: 13, fontWeight: 500, color: '#64748b', marginLeft: 8 }}>
+              ({filteredRows.length} visit{filteredRows.length === 1 ? '' : 's'})
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              className="adm-btn-view"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                background: '#f1f5f9',
+                padding: '6px 12px',
+                borderRadius: 8,
+                fontSize: 12.5,
+                fontWeight: 600,
+                color: '#1e4d8c'
+              }}
+              onClick={loadAppointmentsList}
+              title="Refresh live appointments"
+            >
+              <RefreshCw size={14} className={loading ? 'spin' : ''} /> Refresh
+            </button>
+
+            <button className="adm-add-btn" onClick={() => setShowAdd(true)}>
+              <Plus size={15} /> Book Appointment
+            </button>
+          </div>
+        </div>
+
+        {/* Global Notice Banner */}
+        {notice && (
+          <div style={{
+            background: '#ecfdf5',
+            border: '1px solid #a7f3d0',
+            color: '#065f46',
+            padding: '10px 14px',
+            borderRadius: 8,
+            fontSize: 13,
+            fontWeight: 600,
+            marginBottom: 16,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+          }}>
+            <CheckCircle2 size={16} /> {notice}
+          </div>
+        )}
+
+        {/* Filter Controls Toolbar */}
+        <div style={{
+          background: '#f8fafc',
+          border: '1px solid #e2e8f0',
+          borderRadius: 10,
+          padding: '14px 16px',
+          marginBottom: 18,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, color: '#334155' }}>
+            <Filter size={15} color="#1e4d8c" /> Filter Appointments
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+            {/* Filter: Doctor */}
+            <div>
+              <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#475569', marginBottom: 4 }}>
+                Doctor:
+              </label>
+              <select
+                className="adm-inp"
+                style={{ padding: '7px 10px', fontSize: 12.5 }}
+                value={filterDoctor}
+                onChange={e => setFilterDoctor(e.target.value)}
+              >
+                <option value="">All Doctors</option>
+                {doctors.map(d => (
+                  <option key={d.id} value={d.id}>
+                    {d.doctor_name || `Dr. ID ${d.id}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Filter: Patient */}
+            <div>
+              <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#475569', marginBottom: 4 }}>
+                Patient:
+              </label>
+              <select
+                className="adm-inp"
+                style={{ padding: '7px 10px', fontSize: 12.5 }}
+                value={filterPatient}
+                onChange={e => setFilterPatient(e.target.value)}
+              >
+                <option value="">All Patients</option>
+                {patients.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.patient_name} (ID: {p.id})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Filter: Status */}
+            <div>
+              <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#475569', marginBottom: 4 }}>
+                Status:
+              </label>
+              <select
+                className="adm-inp"
+                style={{ padding: '7px 10px', fontSize: 12.5 }}
+                value={filterStatus}
+                onChange={e => setFilterStatus(e.target.value)}
+              >
+                <option value="All">All Statuses</option>
+                <option value="Confirmed">Confirmed</option>
+                <option value="Pending">Pending</option>
+                <option value="Completed">Completed</option>
+                <option value="Cancelled">Cancelled</option>
+              </select>
+            </div>
+
+            {/* Filter: Date Mode Selection */}
+            <div>
+              <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#475569', marginBottom: 4 }}>
+                Date Filter:
+              </label>
+              <div style={{ display: 'flex', gap: 4 }}>
+                <button
+                  type="button"
+                  style={{
+                    flex: 1,
+                    padding: '7px 8px',
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    borderRadius: 6,
+                    border: '1px solid #cbd5e1',
+                    background: dateMode === 'single' ? '#1e4d8c' : '#fff',
+                    color: dateMode === 'single' ? '#fff' : '#475569',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => { setDateMode('single'); setFilterStartDate(''); setFilterEndDate(''); }}
+                >
+                  Single Date
+                </button>
+                <button
+                  type="button"
+                  style={{
+                    flex: 1,
+                    padding: '7px 8px',
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    borderRadius: 6,
+                    border: '1px solid #cbd5e1',
+                    background: dateMode === 'range' ? '#1e4d8c' : '#fff',
+                    color: dateMode === 'range' ? '#fff' : '#475569',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => { setDateMode('range'); setFilterDate(''); }}
+                >
+                  Date Range
+                </button>
+              </div>
+            </div>
+
+            {/* Filter: Date Input (Single vs Range) */}
+            {dateMode === 'single' ? (
+              <div>
+                <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#475569', marginBottom: 4 }}>
+                  Select Date:
+                </label>
+                <input
+                  type="date"
+                  className="adm-inp"
+                  style={{ padding: '6px 10px', fontSize: 12.5 }}
+                  value={filterDate}
+                  onChange={e => setFilterDate(e.target.value)}
+                />
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: 6 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#475569', marginBottom: 4 }}>
+                    Start Date:
+                  </label>
+                  <input
+                    type="date"
+                    className="adm-inp"
+                    style={{ padding: '6px 8px', fontSize: 11.5 }}
+                    value={filterStartDate}
+                    onChange={e => setFilterStartDate(e.target.value)}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', fontSize: 11.5, fontWeight: 700, color: '#475569', marginBottom: 4 }}>
+                    End Date:
+                  </label>
+                  <input
+                    type="date"
+                    className="adm-inp"
+                    style={{ padding: '6px 8px', fontSize: 11.5 }}
+                    value={filterEndDate}
+                    onChange={e => setFilterEndDate(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Search bar + Clear filters */}
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 4 }}>
+            <div className="adm-search" style={{ maxWidth: '100%', flex: 1 }}>
+              <Search size={15} color="#9ca3af" />
+              <input
+                placeholder="Search by patient name, doctor, or visit reason…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
+            {(filterDoctor || filterPatient || filterStatus !== 'All' || filterDate || filterStartDate || filterEndDate || search) && (
+              <button
+                type="button"
+                style={{
+                  background: '#f1f5f9',
+                  border: '1px solid #cbd5e1',
+                  color: '#475569',
+                  padding: '7px 12px',
+                  borderRadius: 8,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+                onClick={clearAllFilters}
+              >
+                Clear Filters
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Appointments Table */}
         <div className="adm-table-wrap">
           <table className="adm-table">
-            <thead><tr><th>ID</th><th>Patient</th><th>Date</th><th>Time</th><th>Service</th><th>Doctor</th><th>Status</th><th>Actions</th></tr></thead>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Patient</th>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Doctor</th>
+                <th>Reason / Service</th>
+                <th>Status</th>
+                <th>Quick Status</th>
+                <th style={{ textAlign: 'center' }}>Actions</th>
+              </tr>
+            </thead>
             <tbody>
-              {filtered.map(a=>(
-                <tr key={a.id}>
-                  <td>{a.id}</td><td>{a.patient}</td><td>{fmt(a.date)}</td><td>{a.time}</td>
-                  <td>{a.service}</td><td>{a.doctor}</td><td><StatusBadge status={a.status}/></td>
-                  <td><div className="adm-actions">
-                    <button className="adm-btn-view" onClick={()=>setViewA(a)}><Eye size={17}/></button>
-                    <button className="adm-btn-delete" onClick={()=>setDeleteA(a)}><Trash2 size={16}/></button>
-                  </div></td>
+              {loading ? (
+                <tr>
+                  <td colSpan={9} style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
+                    <RefreshCw size={20} className="spin" style={{ margin: '0 auto 8px', display: 'block' }} />
+                    Loading live appointments from database…
+                  </td>
                 </tr>
-              ))}
+              ) : error ? (
+                <tr>
+                  <td colSpan={9} style={{ textAlign: 'center', padding: '24px', color: '#b91c1c' }}>
+                    <AlertTriangle size={20} style={{ margin: '0 auto 6px', display: 'block' }} />
+                    {error}
+                  </td>
+                </tr>
+              ) : filteredRows.length === 0 ? (
+                <tr>
+                  <td colSpan={9} style={{ textAlign: 'center', padding: '32px', color: '#94a3b8' }}>
+                    No appointments found matching your filter criteria.
+                  </td>
+                </tr>
+              ) : (
+                filteredRows.map(a => (
+                  <tr key={a.id}>
+                    <td style={{ fontWeight: 700, color: '#1e4d8c' }}>#{a.id}</td>
+                    <td>
+                      <strong>{a.patient_name || 'Patient'}</strong>
+                      {a.patient_id && (
+                        <span style={{ fontSize: 11, color: '#64748b', display: 'block' }}>
+                          ID: {a.patient_id}
+                        </span>
+                      )}
+                    </td>
+                    <td>{fmt(a.appointment_date)}</td>
+                    <td style={{ fontWeight: 600 }}>{formatTimeDisplay(a.appointment_time)}</td>
+                    <td style={{ color: '#0369a1' }}>{a.doctor_name || 'Assigned Doctor'}</td>
+                    <td>{a.reason_for_visit || 'General Consultation'}</td>
+                    <td>
+                      <StatusBadge status={a.status || 'Confirmed'} />
+                    </td>
+                    <td>
+                      <select
+                        style={{
+                          fontSize: 11.5,
+                          padding: '4px 6px',
+                          borderRadius: 6,
+                          border: '1px solid #cbd5e1',
+                          background: '#fff',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                        value={a.status || 'Confirmed'}
+                        onChange={e => handleStatusUpdate(a.id, e.target.value)}
+                        title="Update appointment status"
+                      >
+                        <option value="Confirmed">Confirmed</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Completed">Completed</option>
+                        <option value="Cancelled">Cancelled</option>
+                      </select>
+                    </td>
+                    <td>
+                      <div className="adm-actions" style={{ justifyContent: 'center' }}>
+                        <button
+                          className="adm-btn-view"
+                          onClick={() => handleOpenView(a)}
+                          title="View Full Appointment Details"
+                        >
+                          <Eye size={17} />
+                        </button>
+                        <button
+                          className="adm-btn-edit"
+                          onClick={() => handleOpenReschedule(a)}
+                          title="Reschedule Appointment"
+                          style={{ color: '#0284c7' }}
+                        >
+                          <Clock size={16} />
+                        </button>
+                        <button
+                          className="adm-btn-delete"
+                          onClick={() => setCancelA(a)}
+                          title="Cancel Appointment"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       </div>
-      {showAdd && <Overlay onClose={()=>setShowAdd(false)}><ModalHdr title="New Appointment" onClose={()=>setShowAdd(false)}/>
-        <div className="adm-modal-body"><form onSubmit={doAdd}>
-          <Field label="Patient Name:"><Inp value={addF.patient} placeholder="Patient" onChange={e=>setAddF({...addF,patient:e.target.value})}/></Field>
-          <div className="adm-field-row">
-            <Field label="Date:"><Inp type="date" value={addF.date} onChange={e=>setAddF({...addF,date:e.target.value})}/></Field>
-            <Field label="Time:"><Inp value={addF.time} placeholder="09:00 AM" onChange={e=>setAddF({...addF,time:e.target.value})}/></Field>
+
+      {/* MODAL 1: VIEW DETAILS (getAppointment) */}
+      {viewA && (
+        <Overlay onClose={() => setViewA(null)}>
+          <ModalHdr title={`Appointment Details #${viewA.id}`} onClose={() => setViewA(null)} />
+          <div className="adm-modal-body">
+            {loadingView && (
+              <p style={{ fontSize: 12, color: '#64748b', marginBottom: 12 }}>
+                Refreshing latest details from server…
+              </p>
+            )}
+            <Field label="Appointment ID:">
+              <RO val={`APP-${String(viewA.id).padStart(3, '0')} (ID: ${viewA.id})`} />
+            </Field>
+
+            <Field label="Patient:">
+              <RO val={`${viewA.patient_name || 'Patient'} (ID: ${viewA.patient_id})`} />
+            </Field>
+
+            <div className="adm-field-row">
+              <Field label="Appointment Date:">
+                <RO val={fmt(viewA.appointment_date)} />
+              </Field>
+              <Field label="Appointment Time:">
+                <RO val={formatTimeDisplay(viewA.appointment_time)} />
+              </Field>
+            </div>
+
+            <Field label="Attending Doctor:">
+              <RO val={`${viewA.doctor_name || 'Doctor'} (Doctor ID: ${viewA.doctor_id})`} />
+            </Field>
+
+            <Field label="Reason for Visit / Service:">
+              <RO val={viewA.reason_for_visit || 'General Consultation'} />
+            </Field>
+
+            <Field label="Current Status:">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <StatusBadge status={viewA.status || 'Confirmed'} />
+                <span style={{ fontSize: 12, color: '#64748b' }}>Change to:</span>
+                {['Pending', 'Confirmed', 'Completed', 'Cancelled'].map(st => (
+                  <button
+                    key={st}
+                    type="button"
+                    style={{
+                      border: '1px solid #cbd5e1',
+                      borderRadius: 6,
+                      padding: '3px 8px',
+                      fontSize: 11,
+                      fontWeight: 700,
+                      background: viewA.status === st ? '#1e4d8c' : '#f8fafc',
+                      color: viewA.status === st ? '#fff' : '#334155',
+                      cursor: 'pointer'
+                    }}
+                    onClick={() => handleStatusUpdate(viewA.id, st)}
+                  >
+                    {st}
+                  </button>
+                ))}
+              </div>
+            </Field>
+
+            <div style={{ marginTop: 22, display: 'flex', gap: 10 }}>
+              <button
+                type="button"
+                className="adm-submit"
+                style={{ background: '#0284c7', flex: 1 }}
+                onClick={() => {
+                  const target = viewA;
+                  setViewA(null);
+                  handleOpenReschedule(target);
+                }}
+              >
+                Reschedule Visit
+              </button>
+              <button
+                type="button"
+                className="adm-btn-cancel"
+                style={{ flex: 1 }}
+                onClick={() => setViewA(null)}
+              >
+                Close
+              </button>
+            </div>
           </div>
-          <Field label="Service:">
-            <select className="adm-inp" value={addF.service} onChange={e=>setAddF({...addF,service:e.target.value})}>
-              {['General Checkup','Vaccination','Follow-up','Lab Test','Consultation'].map(s=><option key={s}>{s}</option>)}
-            </select>
-          </Field>
-          <Field label="Doctor:"><Inp value={addF.doctor} placeholder="Doctor name" onChange={e=>setAddF({...addF,doctor:e.target.value})}/></Field>
-          <Field label="Status:">
-            <select className="adm-inp" value={addF.status} onChange={e=>setAddF({...addF,status:e.target.value})}>
-              <option>Confirmed</option><option>Pending</option>
-            </select>
-          </Field>
-          <SubmitBtn label="Book Appointment"/>
-        </form></div>
-      </Overlay>}
-      {viewA && <Overlay onClose={()=>setViewA(null)}><ModalHdr title="Appointment Details" onClose={()=>setViewA(null)}/>
-        <div className="adm-modal-body">
-          <Field label="ID:"><RO val={viewA.id}/></Field>
-          <Field label="Patient:"><RO val={viewA.patient}/></Field>
-          <div className="adm-field-row">
-            <Field label="Date:"><RO val={fmt(viewA.date)}/></Field>
-            <Field label="Time:"><RO val={viewA.time}/></Field>
+        </Overlay>
+      )}
+
+      {/* MODAL 2: CREATE APPOINTMENT (createAppointment + checkAvailability) */}
+      {showAdd && (
+        <Overlay onClose={() => setShowAdd(false)}>
+          <ModalHdr title="Book New Appointment" onClose={() => setShowAdd(false)} />
+          <div className="adm-modal-body">
+            <form onSubmit={handleCreate}>
+              {/* Select Patient */}
+              <Field label="Select Patient: *">
+                <select
+                  className="adm-inp"
+                  value={addF.patient_id}
+                  onChange={e => setAddF({ ...addF, patient_id: e.target.value })}
+                  required
+                >
+                  <option value="">-- Choose registered child/patient --</option>
+                  {patients.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.patient_name} (ID: {p.id}, {p.gender})
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              {/* Select Doctor */}
+              <Field label="Attending Doctor: *">
+                <select
+                  className="adm-inp"
+                  value={addF.doctor_id}
+                  onChange={e => setAddF({ ...addF, doctor_id: e.target.value })}
+                  required
+                >
+                  <option value="">-- Choose pediatrician --</option>
+                  {doctors.map(d => (
+                    <option key={d.id} value={d.id}>
+                      {d.doctor_name || `Dr. ID ${d.id}`}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              {/* Date & Time Slot */}
+              <div className="adm-field-row">
+                <Field label="Visit Date: *">
+                  <input
+                    type="date"
+                    className="adm-inp"
+                    min={new Date().toISOString().split('T')[0]}
+                    value={addF.appointment_date}
+                    onChange={e => setAddF({ ...addF, appointment_date: e.target.value })}
+                    required
+                  />
+                </Field>
+
+                <Field label="Time Slot: *">
+                  <select
+                    className="adm-inp"
+                    value={addF.appointment_time}
+                    onChange={e => setAddF({ ...addF, appointment_time: e.target.value })}
+                    required
+                    disabled={!addF.doctor_id || !addF.appointment_date || addF.checkingSlots}
+                  >
+                    <option value="">
+                      {!addF.doctor_id || !addF.appointment_date
+                        ? 'Select doctor & date first'
+                        : addF.checkingSlots
+                        ? 'Checking availability…'
+                        : '-- Select a free slot --'}
+                    </option>
+                    {STANDARD_TIME_SLOTS.map(slot => {
+                      const isBooked = addF.bookedSlots.includes(slot);
+                      return (
+                        <option key={slot} value={slot} disabled={isBooked}>
+                          {formatTimeDisplay(slot)} {isBooked ? '(Booked - Busy)' : '(Available)'}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </Field>
+              </div>
+
+              {/* Visual Slot Availability Badges */}
+              {addF.doctor_id && addF.appointment_date && (
+                <div style={{ marginBottom: 14 }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 6 }}>
+                    Live Slot Availability for {addF.appointment_date}:
+                  </span>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {STANDARD_TIME_SLOTS.map(slot => {
+                      const isBooked = addF.bookedSlots.includes(slot);
+                      const isSelected = addF.appointment_time === slot;
+                      return (
+                        <button
+                          key={slot}
+                          type="button"
+                          disabled={isBooked}
+                          onClick={() => setAddF({ ...addF, appointment_time: slot })}
+                          style={{
+                            padding: '4px 7px',
+                            borderRadius: 6,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            border: isSelected ? '2px solid #1e4d8c' : '1px solid #cbd5e1',
+                            background: isBooked ? '#f1f5f9' : isSelected ? '#dbeafe' : '#fff',
+                            color: isBooked ? '#94a3b8' : isSelected ? '#1e4d8c' : '#334155',
+                            cursor: isBooked ? 'not-allowed' : 'pointer',
+                            textDecoration: isBooked ? 'line-through' : 'none'
+                          }}
+                        >
+                          {slot}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Reason for visit */}
+              <Field label="Reason for Visit / Service: *">
+                <input
+                  className="adm-inp"
+                  value={addF.reason_for_visit}
+                  placeholder="e.g. Routine vaccination, Fever checkup, Growth monitoring"
+                  onChange={e => setAddF({ ...addF, reason_for_visit: e.target.value })}
+                  required
+                />
+              </Field>
+
+              <SubmitBtn label="Confirm & Book Slot" />
+            </form>
           </div>
-          <Field label="Service:"><RO val={viewA.service}/></Field>
-          <Field label="Doctor:"><RO val={viewA.doctor}/></Field>
-          <Field label="Status:"><StatusBadge status={viewA.status}/></Field>
-        </div>
-      </Overlay>}
-      {deleteA && <Overlay onClose={()=>setDeleteA(null)}><ModalHdr title="Cancel Appointment" onClose={()=>setDeleteA(null)}/>
-        <DeleteConfirm onCancel={()=>setDeleteA(null)} onDelete={doDelete}/>
-      </Overlay>}
+        </Overlay>
+      )}
+
+      {/* MODAL 3: RESCHEDULE APPOINTMENT (rescheduleAppointment + checkAvailability) */}
+      {rescheduleA && (
+        <Overlay onClose={() => setRescheduleA(null)}>
+          <ModalHdr title={`Reschedule Appointment #${rescheduleA.id}`} onClose={() => setRescheduleA(null)} />
+          <div className="adm-modal-body">
+            <p style={{ fontSize: 12.5, color: '#64748b', marginBottom: 14 }}>
+              Rescheduling for patient <strong>{rescheduleA.patient_name}</strong>. Current schedule: {fmt(rescheduleA.appointment_date)} at {formatTimeDisplay(rescheduleA.appointment_time)}.
+            </p>
+
+            <form onSubmit={handleRescheduleSubmit}>
+              <Field label="Assigned Doctor:">
+                <select
+                  className="adm-inp"
+                  value={rescheduleF.doctor_id}
+                  onChange={e => setRescheduleF({ ...rescheduleF, doctor_id: e.target.value })}
+                  required
+                >
+                  {doctors.map(d => (
+                    <option key={d.id} value={d.id}>
+                      {d.doctor_name || `Dr. ID ${d.id}`}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              <div className="adm-field-row">
+                <Field label="New Appointment Date: *">
+                  <input
+                    type="date"
+                    className="adm-inp"
+                    min={new Date().toISOString().split('T')[0]}
+                    value={rescheduleF.appointment_date}
+                    onChange={e => setRescheduleF({ ...rescheduleF, appointment_date: e.target.value })}
+                    required
+                  />
+                </Field>
+
+                <Field label="New Time Slot: *">
+                  <select
+                    className="adm-inp"
+                    value={rescheduleF.appointment_time}
+                    onChange={e => setRescheduleF({ ...rescheduleF, appointment_time: e.target.value })}
+                    required
+                    disabled={rescheduleF.checkingSlots}
+                  >
+                    <option value="">
+                      {rescheduleF.checkingSlots ? 'Checking slot availability…' : '-- Choose free time slot --'}
+                    </option>
+                    {STANDARD_TIME_SLOTS.map(slot => {
+                      const isBooked = rescheduleF.bookedSlots.includes(slot);
+                      return (
+                        <option key={slot} value={slot} disabled={isBooked}>
+                          {formatTimeDisplay(slot)} {isBooked ? '(Booked - Conflict)' : '(Free slot)'}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </Field>
+              </div>
+
+              {/* Slot badges for reschedule */}
+              {rescheduleF.appointment_date && (
+                <div style={{ marginBottom: 14 }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 700, color: '#475569', display: 'block', marginBottom: 6 }}>
+                    Available time slots on {rescheduleF.appointment_date}:
+                  </span>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {STANDARD_TIME_SLOTS.map(slot => {
+                      const isBooked = rescheduleF.bookedSlots.includes(slot);
+                      const isSelected = rescheduleF.appointment_time === slot;
+                      return (
+                        <button
+                          key={slot}
+                          type="button"
+                          disabled={isBooked}
+                          onClick={() => setRescheduleF({ ...rescheduleF, appointment_time: slot })}
+                          style={{
+                            padding: '4px 7px',
+                            borderRadius: 6,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            border: isSelected ? '2px solid #0284c7' : '1px solid #cbd5e1',
+                            background: isBooked ? '#f1f5f9' : isSelected ? '#e0f2fe' : '#fff',
+                            color: isBooked ? '#94a3b8' : isSelected ? '#0284c7' : '#334155',
+                            cursor: isBooked ? 'not-allowed' : 'pointer',
+                            textDecoration: isBooked ? 'line-through' : 'none'
+                          }}
+                        >
+                          {slot}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+                <button type="submit" className="adm-submit" style={{ flex: 1, background: '#0284c7' }}>
+                  Save & Reschedule
+                </button>
+                <button
+                  type="button"
+                  className="adm-btn-cancel"
+                  style={{ flex: 1 }}
+                  onClick={() => setRescheduleA(null)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </Overlay>
+      )}
+
+      {/* MODAL 4: CANCEL APPOINTMENT CONFIRMATION */}
+      {cancelA && (
+        <Overlay onClose={() => setCancelA(null)}>
+          <ModalHdr title="Cancel Appointment" onClose={() => setCancelA(null)} />
+          <div className="adm-del-body">
+            <div className="adm-del-icon"><AlertCircle size={38} color="#7b1717" /></div>
+            <div className="adm-del-title">Cancel Appointment #{cancelA.id}?</div>
+            <div className="adm-del-sub">
+              Are you sure you want to cancel the appointment for <strong>{cancelA.patient_name}</strong> on {fmt(cancelA.appointment_date)} at {formatTimeDisplay(cancelA.appointment_time)}?
+            </div>
+            <div className="adm-del-btns">
+              <button className="adm-btn-cancel" onClick={() => setCancelA(null)}>Keep Visit</button>
+              <button className="adm-btn-confirm" onClick={handleConfirmCancel}>Confirm Cancellation</button>
+            </div>
+          </div>
+        </Overlay>
+      )}
     </>
-  )
+  );
 }
 
 function SectionVaccinations() {

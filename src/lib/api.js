@@ -73,4 +73,35 @@ export const listFeedback = (token) => request('/api/feedback', { token })
 export const submitFeedback = (payload, token) =>
   request('/api/feedback', { method: 'POST', body: payload, token })
 
+// ---- Doctors ----
+export const listDoctors = (token) => request('/api/doctors', { token })
+
+// ---- Appointments ----
+export const checkAvailability = (doctorId, date, token) =>
+  request(`/api/appointments/availability?doctor_id=${encodeURIComponent(doctorId)}&date=${encodeURIComponent(date)}`, { token })
+
+export const listAppointments = (token, filters = {}) => {
+  const params = new URLSearchParams()
+  if (filters.doctor_id) params.set('doctor_id', filters.doctor_id)
+  if (filters.patient_id) params.set('patient_id', filters.patient_id)
+  if (filters.status && filters.status !== 'All') params.set('status', filters.status)
+  if (filters.date) params.set('date', filters.date)
+  if (filters.start_date) params.set('start_date', filters.start_date)
+  if (filters.end_date) params.set('end_date', filters.end_date)
+  const qs = params.toString()
+  return request(`/api/appointments${qs ? `?${qs}` : ''}`, { token })
+}
+
+export const getAppointment = (id, token) =>
+  request(`/api/appointments/${id}`, { token })
+
+export const createAppointment = (payload, token) =>
+  request('/api/appointments', { method: 'POST', body: payload, token })
+
+export const updateAppointmentStatus = (id, status, token) =>
+  request(`/api/appointments/${id}/status`, { method: 'PATCH', body: { status }, token })
+
+export const rescheduleAppointment = (id, payload, token) =>
+  request(`/api/appointments/${id}`, { method: 'PATCH', body: payload, token })
+
 export { ApiError, API_BASE }

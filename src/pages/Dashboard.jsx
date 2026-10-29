@@ -7,7 +7,15 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import DashboardSidebar from '../components/DashboardSidebar.jsx'
-import { listMyPatients, registerPatient, updatePatient } from '../lib/api.js'
+import {
+  listMyPatients,
+  registerPatient,
+  updatePatient,
+  listAppointments,
+  createAppointment,
+  listDoctors,
+  checkAvailability,
+} from '../lib/api.js'
 
 function calcAge(dob) {
   if (!dob) return '—'
