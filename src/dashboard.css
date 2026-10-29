@@ -1120,6 +1120,33 @@
 .fb-submit-btn {
   margin-left: auto;
   border-radius: 20px;
+  background: var(--pink);
+  color: #fff;
+  cursor: not-allowed;
+  box-shadow: none;
+  transition: background 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+.fb-submit-btn:hover,
+.fb-submit-btn:disabled {
+  filter: none;
+  opacity: 1;
+  background: var(--pink);
+  color: #fff;
+  cursor: not-allowed;
+}
+
+.fb-submit-btn.is-ready {
+  background: var(--rose);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(223, 115, 131, 0.45);
+}
+
+.fb-submit-btn.is-ready:hover {
+  filter: brightness(1.08);
+  background: var(--rose);
+  cursor: pointer;
 }
 
 .fb-rating-card {

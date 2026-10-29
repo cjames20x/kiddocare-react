@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import DashboardSidebar from '../components/DashboardSidebar.jsx'
+import { listMyPatients, registerPatient, updatePatient } from '../lib/api.js'
 
 function calcAge(dob) {
   if (!dob) return '—'
@@ -26,6 +27,46 @@ function todayLocal() {
   const d = new Date()
   const pad = (n) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+// A <select> always returns the id as text. Patient ids from the database are numbers.
+function sameId(a, b) {
+  return a != null && b != null && String(a) === String(b)
+}
+
+// Fallback only. New weight/height values are stored in medical_records.
+// Older readings that were saved in this browser still show until re-saved.
+const CHILD_METRICS_KEY = 'kiddocare-child-metrics'
+
+function readChildMetrics() {
+  try {
+    return JSON.parse(localStorage.getItem(CHILD_METRICS_KEY) || '{}')
+  } catch {
+    return {}
+  }
+}
+
+function metricNumber(value) {
+  const text = String(value ?? '').trim()
+  if (!text || text === '—') return ''
+  const match = text.match(/[\d.]+/)
+  if (!match) return ''
+  const num = Number(match[0])
+  return Number.isFinite(num) && num >= 0 ? String(num) : ''
+}
+
+function saveChildMetrics(id, weight, height) {
+  const all = readChildMetrics()
+  all[String(id)] = { weight: metricNumber(weight), height: metricNumber(height) }
+  localStorage.setItem(CHILD_METRICS_KEY, JSON.stringify(all))
+}
+
+function formatKg(value) {
+  return value ? `${value} kg` : '—'
+}
+
+function formatCm(value) {
+  return value ? `${value} cm` : '—'
 }
 
 // Normalizes casing so older/mismatched records ("checkup") display the same as ("Checkup")
@@ -68,11 +109,11 @@ function ChildRecordModal({ child, onClose, onRebook, getChildAppointments }) {
             </div>
             <div className="kcmr-stat">
               <div className="kcmr-stat-label">Weight</div>
-              <div className="kcmr-stat-value">{child.weight && child.weight !== '—' ? child.weight : '8.6 kg'}</div>
+              <div className="kcmr-stat-value">{child.weight || '—'}</div>
             </div>
             <div className="kcmr-stat">
               <div className="kcmr-stat-label">Height</div>
-              <div className="kcmr-stat-value">{child.height && child.height !== '—' ? child.height : '71 cm'}</div>
+              <div className="kcmr-stat-value">{child.height || '—'}</div>
             </div>
             <div className="kcmr-stat">
               <div className="kcmr-stat-label">Last Visit</div>
@@ -174,8 +215,99 @@ function ChildRecordModal({ child, onClose, onRebook, getChildAppointments }) {
   )
 }
 
+// Lightweight demographic-edit modal — PUT /api/patients/:id via onSave.
+function EditChildModal({ child, onClose, onSave }) {
+  const [form, setForm] = useState(() => ({
+    name: child.name,
+    dob: child.dob,
+    gender: child.gender === '—' ? 'Male' : child.gender,
+    address: child.address || '',
+    weight: metricNumber(child.weight),
+    height: metricNumber(child.height),
+  }))
+  const [saving, setSaving] = useState(false)
+
+  if (!child) return null
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setSaving(true)
+    await onSave(form)
+    setSaving(false)
+  }
+
+  return (
+    <div className="kcmr-overlay" onClick={onClose}>
+      <div className="kcmr-modal" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
+        <div className="kcmr-header">
+          <button className="kcmr-close" onClick={onClose} aria-label="Close">
+            <X size={15} />
+          </button>
+          <div className="kcmr-avatar">{form.name.charAt(0).toUpperCase()}</div>
+          <div>
+            <div className="kcmr-name">Edit Demographics</div>
+            <div className="kcmr-sub"><span className="kcmr-badge">{child.id}</span></div>
+          </div>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="kcmr-body">
+            <div className="form-group" style={{ marginBottom: 12 }}>
+              <label>Full Name</label>
+              <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+            </div>
+            <div className="form-group" style={{ marginBottom: 12 }}>
+              <label>Date of Birth</label>
+              <input type="date" value={form.dob} onChange={(e) => setForm({ ...form, dob: e.target.value })} required />
+            </div>
+            <div className="form-group" style={{ marginBottom: 12 }}>
+              <label>Gender</label>
+              <select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div className="form-group" style={{ marginBottom: 12 }}>
+              <label>Address</label>
+              <input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Optional" />
+            </div>
+            <div className="form-group" style={{ marginBottom: 12 }}>
+              <label>Weight (kg)</label>
+              <input
+                type="number"
+                min="0"
+                step="0.1"
+                placeholder="e.g. 12.4"
+                value={form.weight}
+                onChange={(e) => setForm({ ...form, weight: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label>Height (cm)</label>
+              <input
+                type="number"
+                min="0"
+                step="0.1"
+                placeholder="e.g. 86"
+                value={form.height}
+                onChange={(e) => setForm({ ...form, height: e.target.value })}
+              />
+            </div>
+          </div>
+          <div className="kcmr-footer">
+            <button type="button" className="kcmr-btn-outline" onClick={onClose} disabled={saving}>Cancel</button>
+            <button type="submit" className="kcmr-btn-close" disabled={saving}>
+              {saving ? 'Saving…' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 export default function Dashboard() {
-  const { user } = useAuth()
+  const { user, accessToken } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -184,52 +316,59 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState('')
   const [viewChild, setViewChild] = useState(null)
   const [legacyViewChild, setLegacyViewChild] = useState(null)
+  const [editChild, setEditChild] = useState(null)
 
-  // Children state (initialized from user and localStorage)
-  const [children, setChildren] = useState(() => {
-    const saved = localStorage.getItem('kiddocare-children')
-    if (saved) {
-      try {
-        return JSON.parse(saved)
-      } catch (e) {
-        console.error(e)
-      }
-    }
-    if (user?.patientName) {
-      return [{
-        id: 'KC-001',
-        name: user.patientName,
-        dob: user.dob || '',
-        age: calcAge(user.dob),
-        gender: user.gender ? user.gender[0].toUpperCase() + user.gender.slice(1) : '—',
-        lastVisit: '2026-08-15',
-        guardian: user.guardianName || '—',
-        contact: user.contactNumber || '—',
-        weight: '8.6 kg',
-        height: '71 cm',
-        allergies: 'Penicillin',
-        vaccinations: ['BCG', 'Hepatitis B', 'Pentavalent (DTP-HepB-Hib)', 'OPV', 'PCV'],
-      }]
-    }
-    return [
-      {
-        id: 'KC-001',
-        name: 'Liam Garcia',
-        dob: '2022-04-12',
-        age: calcAge('2022-04-12'),
-        gender: 'Male',
-        lastVisit: '2026-08-10',
-        guardian: user?.guardianName || 'Maria Garcia',
-        contact: '+63 917 123 4567',
-        weight: '13.2 kg',
-        height: '88 cm',
-        allergies: 'Peanuts',
-        vaccinations: ['BCG', 'Hepatitis B', 'DTaP', 'MMR'],
-      },
-    ]
-  })
+  // Children state — now sourced from the real /api/patients endpoint
+  // (previously this was seeded from localStorage/mock data).
+  const [children, setChildren] = useState([])
+  const [patientsLoading, setPatientsLoading] = useState(true)
+  const [patientsError, setPatientsError] = useState('')
+  const [registerError, setRegisterError] = useState('')
+  const [registerSubmitting, setRegisterSubmitting] = useState(false)
 
-  // Appointments state
+  // Converts a backend patient row into the shape the existing UI expects.
+  // Weight and height come from the latest medical_records row.
+  // Allergies and vaccinations still aren't connected.
+  function toChildShape(p) {
+    const metrics = readChildMetrics()[String(p.id)] || {}
+    return {
+      id: p.id,
+      name: p.patient_name,
+      dob: p.date_of_birth,
+      age: calcAge(p.date_of_birth),
+      gender: p.gender ? p.gender[0].toUpperCase() + p.gender.slice(1) : '—',
+      lastVisit: '—',
+      guardian: user?.guardianName || '—',
+      contact: user?.contactNumber || '—',
+      address: p.address || '',
+      weight: formatKg(p.weight != null ? p.weight : metrics.weight),
+      height: formatCm(p.height != null ? p.height : metrics.height),
+      allergies: 'None known',
+      vaccinations: [],
+    }
+  }
+
+  async function loadPatients() {
+    if (!accessToken) return
+    setPatientsLoading(true)
+    setPatientsError('')
+    try {
+      const patients = await listMyPatients(accessToken)
+      setChildren(patients.map(toChildShape))
+    } catch (err) {
+      setPatientsError(err.message || 'Could not load patients.')
+    } finally {
+      setPatientsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadPatients()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accessToken])
+
+  // Appointments state (still mock/localStorage — the appointments module
+  // hasn't been connected to the backend yet)
   const [appointments, setAppointments] = useState(() => {
     const saved = localStorage.getItem('kiddocare-appointments')
     if (saved) {
@@ -241,7 +380,7 @@ export default function Dashboard() {
       {
         id: 1,
         childId: 'KC-001',
-        childName: children[0]?.name || 'Liam Garcia',
+        childName: 'your child',
         service: 'Checkup',
         date: '2026-10-02',
         time: '09:00 AM - 10:00 AM',
@@ -250,15 +389,27 @@ export default function Dashboard() {
     ]
   })
 
-  // Persist children to localStorage
-  useEffect(() => {
-    localStorage.setItem('kiddocare-children', JSON.stringify(children))
-  }, [children])
-
   // Persist appointments to localStorage
   useEffect(() => {
     localStorage.setItem('kiddocare-appointments', JSON.stringify(appointments))
   }, [appointments])
+
+  // Older bookings stored the dropdown id as text, so the name lookup missed
+  // and saved "Unknown". Once patients are loaded, put the real name back.
+  useEffect(() => {
+    if (!children.length) return
+    setAppointments((current) => {
+      let changed = false
+      const next = current.map((appt) => {
+        const child = children.find((c) => sameId(c.id, appt.childId))
+        if (!child) return appt
+        if (appt.childId === child.id && appt.childName === child.name) return appt
+        changed = true
+        return { ...appt, childId: child.id, childName: child.name }
+      })
+      return changed ? next : current
+    })
+  }, [children])
 
   // The shared sidebar switches tabs by navigating to /dashboard with state,
   // so keep activeTab in sync whenever that navigation happens.
@@ -274,6 +425,8 @@ export default function Dashboard() {
     guardian: user?.guardianName || '',
     contact: user?.contactNumber || '',
     relationship: 'Mother',
+    weight: '',
+    height: '',
   })
 
   // Form states: Book Appointment
@@ -286,40 +439,72 @@ export default function Dashboard() {
   })
 
   // Handle Child Registration
-  function handleRegisterChild(e) {
+  async function handleRegisterChild(e) {
     e.preventDefault()
+    setRegisterError('')
     if (!registerForm.name.trim() || !registerForm.dob) {
-      alert('Please fill out all required fields.')
+      setRegisterError('Please fill out all required fields.')
       return
     }
 
-    const nextId = `KC-00${children.length + 1}`
-    const newChild = {
-      id: nextId,
-      name: registerForm.name.trim(),
-      dob: registerForm.dob,
-      age: calcAge(registerForm.dob),
-      gender: registerForm.gender,
-      lastVisit: '—',
-      guardian: registerForm.guardian || user?.guardianName || '—',
-      contact: registerForm.contact || user?.contactNumber || '—',
-      weight: '—',
-      height: '—',
-      allergies: 'None known',
-      vaccinations: [],
+    if (registerForm.weight === '' || registerForm.height === '' || Number(registerForm.weight) < 0 || Number(registerForm.height) < 0) {
+      setRegisterError('Enter this child’s own weight (kg) and height (cm).')
+      return
     }
 
-    setChildren([newChild, ...children])
-    setRegisterForm({
-      name: '',
-      dob: '',
-      gender: 'Male',
-      guardian: user?.guardianName || '',
-      contact: user?.contactNumber || '',
-      relationship: 'Mother',
-    })
-    alert('Child successfully registered!')
-    setActiveTab('Child Information')
+    setRegisterSubmitting(true)
+    try {
+      const created = await registerPatient(
+        {
+          patient_name: registerForm.name.trim(),
+          date_of_birth: registerForm.dob,
+          gender: registerForm.gender.toLowerCase(),
+          relationship_to_patient: registerForm.relationship || null,
+          weight: Number(registerForm.weight),
+          height: Number(registerForm.height),
+        },
+        accessToken
+      )
+      await loadPatients()
+      setRegisterForm({
+        name: '',
+        dob: '',
+        gender: 'Male',
+        guardian: user?.guardianName || '',
+        contact: user?.contactNumber || '',
+        relationship: 'Mother',
+        weight: '',
+        height: '',
+      })
+      alert('Child successfully registered!')
+      setActiveTab('Child Information')
+    } catch (err) {
+      setRegisterError(err.message || 'Could not register this child. Please try again.')
+    } finally {
+      setRegisterSubmitting(false)
+    }
+  }
+
+  // Handle demographic update (Edit modal)
+  async function handleUpdateChild(updates) {
+    try {
+      await updatePatient(
+        editChild.id,
+        {
+          patient_name: updates.name,
+          date_of_birth: updates.dob,
+          gender: updates.gender.toLowerCase(),
+          address: updates.address,
+          weight: updates.weight === '' ? null : Number(updates.weight),
+          height: updates.height === '' ? null : Number(updates.height),
+        },
+        accessToken
+      )
+      await loadPatients()
+      setEditChild(null)
+    } catch (err) {
+      alert(err.message || 'Could not update this patient. Please try again.')
+    }
   }
 
   // Handle Book Appointment
@@ -330,10 +515,10 @@ export default function Dashboard() {
       return
     }
 
-    const child = children.find((c) => c.id === bookForm.childId)
+    const child = children.find((c) => sameId(c.id, bookForm.childId))
     const newAppt = {
       id: Date.now(),
-      childId: bookForm.childId,
+      childId: child ? child.id : bookForm.childId,
       childName: child ? child.name : 'Unknown',
       service: bookForm.service,
       date: bookForm.date,
@@ -350,7 +535,7 @@ export default function Dashboard() {
   // Get this child's appointments, most relevant (soonest upcoming) first
   function getChildAppointments(childId) {
     return appointments
-      .filter((a) => a.childId === childId)
+      .filter((a) => sameId(a.childId, childId))
       .slice()
       .sort((a, b) => new Date(a.date) - new Date(b.date))
   }
@@ -529,7 +714,11 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredChildren.length === 0 ? (
+                  {patientsLoading ? (
+                    <tr><td colSpan={7} style={{ textAlign: 'center', color: '#999', padding: '28px' }}>Loading patients…</td></tr>
+                  ) : patientsError ? (
+                    <tr><td colSpan={7} style={{ textAlign: 'center', color: '#b3412c', padding: '28px' }}>{patientsError}</td></tr>
+                  ) : filteredChildren.length === 0 ? (
                     <tr>
                       <td colSpan={7} style={{ textAlign: 'center', color: '#999', padding: '28px' }}>
                         No children registered yet.
@@ -582,7 +771,7 @@ export default function Dashboard() {
             <div className="dash-search">
               <div className="dash-search-input">
                 <input
-                  placeholder="Search Patients by name, ID, guardian..."
+                  placeholder="Search patients by name or guardian..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -600,29 +789,35 @@ export default function Dashboard() {
               <table className="dash-table">
                 <thead>
                   <tr>
-                    <th>PatientId</th>
                     <th>Name</th>
                     <th>Age</th>
                     <th>Gender</th>
+                    <th>Weight</th>
+                    <th>Height</th>
                     <th>Next Visit</th>
                     <th>Parent/Guardian</th>
                     <th style={{ textAlign: 'center' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredChildren.length === 0 ? (
+                  {patientsLoading ? (
+                    <tr><td colSpan={8} style={{ textAlign: 'center', color: '#999', padding: '28px' }}>Loading patients…</td></tr>
+                  ) : patientsError ? (
+                    <tr><td colSpan={8} style={{ textAlign: 'center', color: '#b3412c', padding: '28px' }}>{patientsError}</td></tr>
+                  ) : filteredChildren.length === 0 ? (
                     <tr>
-                      <td colSpan={7} style={{ textAlign: 'center', color: '#999', padding: '28px' }}>
+                      <td colSpan={8} style={{ textAlign: 'center', color: '#999', padding: '28px' }}>
                         No children registered yet.
                       </td>
                     </tr>
                   ) : (
                     filteredChildren.map((c) => (
                       <tr key={c.id}>
-                        <td><strong>{c.id}</strong></td>
                         <td style={{ fontWeight: 600, color: 'var(--blue)' }}>{c.name}</td>
                         <td>{c.age}</td>
                         <td>{c.gender}</td>
+                        <td>{c.weight}</td>
+                        <td>{c.height}</td>
                         <td>{getNextVisit(c.id)}</td>
                         <td>{c.guardian}</td>
                         <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
@@ -636,6 +831,12 @@ export default function Dashboard() {
                             onClick={() => setViewChild(c)}
                           >
                             View
+                          </button>
+                          <button
+                            className="dash-action-btn btn-action-book"
+                            onClick={() => setEditChild(c)}
+                          >
+                            Edit
                           </button>
                         </td>
                       </tr>
@@ -655,6 +856,7 @@ export default function Dashboard() {
             <h3>
               <Baby size={22} /> Register Child
             </h3>
+            {registerError && <p className="auth-error">{registerError}</p>}
 
             <form className="appointment-form" onSubmit={handleRegisterChild} style={{ padding: '16px 0' }}>
               <div className="form-row">
@@ -711,6 +913,37 @@ export default function Dashboard() {
 
               <div className="form-row">
                 <div className="form-group">
+                  <label>
+                    Weight (kg): <span className="required">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    placeholder="e.g. 12.4"
+                    value={registerForm.weight}
+                    onChange={(e) => setRegisterForm({ ...registerForm, weight: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>
+                    Height (cm): <span className="required">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    placeholder="e.g. 86"
+                    value={registerForm.height}
+                    onChange={(e) => setRegisterForm({ ...registerForm, height: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
                   <label>Guardian Contact Number:</label>
                   <input
                     type="tel"
@@ -730,8 +963,8 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <button type="submit" className="btn-book" style={{ marginTop: '12px' }}>
-                Register Child
+              <button type="submit" className="btn-book" style={{ marginTop: '12px' }} disabled={registerSubmitting}>
+                {registerSubmitting ? 'Registering…' : 'Register Child'}
               </button>
             </form>
           </div>
@@ -877,7 +1110,7 @@ export default function Dashboard() {
                   ) : (
                     appointments.map((a) => (
                       <tr key={a.id}>
-                        <td><strong>{a.childName}</strong></td>
+                        <td><strong>{children.find((c) => sameId(c.id, a.childId))?.name || a.childName}</strong></td>
                         <td>{formatServiceName(a.service)}</td>
                         <td>{a.date}</td>
                         <td>{a.time}</td>
@@ -943,6 +1176,15 @@ export default function Dashboard() {
           child={viewChild}
           onClose={() => setViewChild(null)}
           getChildAppointments={getChildAppointments}
+        />
+      )}
+
+      {/* Demographic update modal — PUT /api/patients/:id */}
+      {editChild && (
+        <EditChildModal
+          child={editChild}
+          onClose={() => setEditChild(null)}
+          onSave={handleUpdateChild}
         />
       )}
     </div>

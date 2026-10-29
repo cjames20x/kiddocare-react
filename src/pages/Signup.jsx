@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar.jsx'
 import Footer from '../components/Footer.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
+import { registerPatient } from '../lib/api.js'
 
 const PH_PHONE_PATTERN = '^09[0-9]{9}$'
 // at least one letter, one number, one special character, 8+ chars
@@ -19,7 +20,9 @@ export default function Signup() {
   })
   const [agreed, setAgreed] = useState(false)
   const [showTerms, setShowTerms] = useState(false)
-  const { login } = useAuth()
+  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const { register } = useAuth()
   const navigate = useNavigate()
 
   function update(field, value) {
@@ -33,6 +36,73 @@ export default function Signup() {
       return
     }
     setStep('done')
+  }
+
+  // The real `users` table needs a unique username; the form only collects
+  // email, so derive one from it (plus a short random suffix in case two
+  // guardians share an email prefix).
+  function deriveUsername(email) {
+    const base = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '')
+    return `${base}${Math.floor(1000 + Math.random() * 9000)}`
+  }
+
+  async function handleCreateAccount() {
+    setError('')
+    setSubmitting(true)
+    try {
+      const payload = {
+        username: deriveUsername(form.email),
+        email: form.email,
+        password: form.password,
+        full_name: form.guardianName,
+        role: 'guardian',
+        contact_number: form.contactNumber,
+      }
+      // Patient-specific fields aren't in the backend's users table yet —
+      // kept alongside in localStorage so Dashboard.jsx (which already
+      // expects them on `user`) keeps working until the patients module
+      // is wired up to this frontend too.
+      const signupExtras = {
+        patientName: form.patientName,
+        dob: form.dob,
+        gender: form.gender,
+        address: form.address,
+        relationship: form.relationship,
+      }
+      const result = await register(payload, signupExtras)
+      if (result.mfaRequired) {
+        // Shouldn't happen right after signup (MFA has to be turned on
+        // separately), but handle it gracefully just in case.
+        navigate('/login')
+        return
+      }
+
+      // Now that we have a real guardian account + session, register the
+      // actual patient record (previously this only went into localStorage).
+      try {
+        await registerPatient(
+          {
+            patient_name: form.patientName,
+            date_of_birth: form.dob,
+            gender: form.gender.toLowerCase(),
+            address: form.address || null,
+            relationship_to_patient: form.relationship || null,
+          },
+          result.accessToken
+        )
+      } catch (patientErr) {
+        // The guardian account exists and is logged in at this point —
+        // don't block them from reaching the dashboard over this. They can
+        // register the child again from there if this failed.
+        console.error('Patient registration failed:', patientErr.message)
+      }
+
+      navigate('/dashboard')
+    } catch (err) {
+      setError(err.message || 'Could not create your account. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const StepBar = ({ upTo }) => (
@@ -178,22 +248,14 @@ export default function Signup() {
             <h2>You're all set</h2>
             <div className="success-box">
               <div className="success-icon">✓</div>
-              <p>Account created successfully!</p>
+              <p>Ready to create your account.</p>
+              {error && <p className="auth-error">{error}</p>}
               <button
                 className="btn-primary"
-                onClick={() => {
-                  login({
-                    guardianName: form.guardianName,
-                    patientName: form.patientName,
-                    dob: form.dob,
-                    gender: form.gender,
-                    email: form.email,
-                    contactNumber: form.contactNumber,
-                  })
-                  navigate('/dashboard')
-                }}
+                disabled={submitting}
+                onClick={handleCreateAccount}
               >
-                Log In
+                {submitting ? 'Creating account…' : 'Create Account & Log In'}
               </button>
             </div>
           </div>

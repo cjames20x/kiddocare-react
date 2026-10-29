@@ -12,6 +12,7 @@ import Payments from './pages/Payments.jsx'
 import UserDashboard from './pages/UserDashboard.jsx'
 import AdminLogin from './pages/AdminLogin.jsx'
 import AdminDashboard from './pages/AdminDashboard.jsx'
+import ProtectedRoute, { STAFF_ROLES } from './components/ProtectedRoute.jsx'
 
 export default function App() {
   return (
@@ -20,15 +21,23 @@ export default function App() {
       <Route path="/services" element={<Services />} />
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
-      <Route path="/dashboard" element={<Dashboard />} />
-      <Route path="/documents" element={<Documents />} />
-      <Route path="/feedback" element={<Feedback />} />
-      <Route path="/help" element={<Help />} />
-      <Route path="/vaccinations" element={<Vaccinations />} />
-      <Route path="/payments" element={<Payments />} />
-      <Route path="/user-dashboard" element={<UserDashboard />} />
       <Route path="/admin" element={<AdminLogin />} />
-      <Route path="/admin-dashboard" element={<AdminDashboard />} />
+
+      {/* Guardian-only routes */}
+      <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/documents" element={<ProtectedRoute><Documents /></ProtectedRoute>} />
+      <Route path="/feedback" element={<ProtectedRoute><Feedback /></ProtectedRoute>} />
+      <Route path="/help" element={<ProtectedRoute><Help /></ProtectedRoute>} />
+      <Route path="/vaccinations" element={<ProtectedRoute><Vaccinations /></ProtectedRoute>} />
+      <Route path="/payments" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
+      <Route path="/user-dashboard" element={<ProtectedRoute><UserDashboard /></ProtectedRoute>} />
+
+      {/* Staff-only route */}
+      <Route
+        path="/admin-dashboard"
+        element={<ProtectedRoute roles={STAFF_ROLES}><AdminDashboard /></ProtectedRoute>}
+      />
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

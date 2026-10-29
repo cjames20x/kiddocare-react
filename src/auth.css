@@ -102,6 +102,17 @@ body:has(.step-bar) .auth-card { max-width: 460px; }
 }
 .success-box p { color: var(--slate-63); font-size: 14px; margin-bottom: 20px; }
 
+.auth-error {
+  background: #fdecea;
+  color: #b3412c;
+  border: 1px solid #f5c6cb;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13.5px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
 @media (max-width: 480px) {
   .auth-card { padding: 26px 20px; }
   .auth-body { padding: 30px 16px; }

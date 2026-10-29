@@ -4,21 +4,58 @@ import Navbar from '../components/Navbar.jsx'
 import Footer from '../components/Footer.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 
+const STAFF_ROLES = ['admin', 'clinic_manager', 'doctor', 'staff']
+
 export default function AdminLogin() {
-  const { login } = useAuth()
+  const { login, completeMfaLogin, logout } = useAuth()
   const navigate = useNavigate()
   const [showPw, setShowPw] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
-  function handleSubmit(e) {
+  const [mfaPendingToken, setMfaPendingToken] = useState(null)
+  const [mfaCode, setMfaCode] = useState('')
+
+  function enforceStaffRole(user) {
+    if (!STAFF_ROLES.includes(user.role)) {
+      logout()
+      setError('This portal is for clinic staff accounts, not guardian accounts.')
+      return false
+    }
+    return true
+  }
+
+  async function handleSubmit(e) {
     e.preventDefault()
-    if (email === 'kiddocareadmin@gmail.com') {
-      login()
-      navigate('/admin-dashboard')
-    } else {
-      setError('Invalid admin credentials')
+    setError('')
+    setSubmitting(true)
+    try {
+      const result = await login(email, password)
+      if (result.mfaRequired) {
+        setMfaPendingToken(result.mfaPendingToken)
+      } else if (enforceStaffRole(result.user)) {
+        navigate('/admin-dashboard')
+      }
+    } catch (err) {
+      setError(err.message || 'Invalid admin credentials')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function handleMfaSubmit(e) {
+    e.preventDefault()
+    setError('')
+    setSubmitting(true)
+    try {
+      const user = await completeMfaLogin(mfaPendingToken, mfaCode)
+      if (enforceStaffRole(user)) navigate('/admin-dashboard')
+    } catch (err) {
+      setError(err.message || 'Invalid code. Please try again.')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -31,34 +68,56 @@ export default function AdminLogin() {
 
         <div className="auth-card">
           <img src="/images/kiddocare-logo.png" alt="KiddoCare" className="auth-logo auth-logo--lg" />
-          <h2>Admin Login</h2>
-          <p className="auth-sub spaced">Sign in to access the administrator dashboard</p>
-          {error && <p style={{ color: 'red', textAlign: 'center', marginBottom: '1rem' }}>{error}</p>}
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label>Email:</label>
-              <input 
-                type="email" 
-                placeholder="admin@gmail.com" 
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required 
-              />
-            </div>
-            <div className="form-group password-wrap">
-              <label>Password:</label>
-              <input 
-                type={showPw ? 'text' : 'password'} 
-                placeholder="Enter your password" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required 
-              />
-              <button type="button" className="toggle-pw" onClick={() => setShowPw(!showPw)}>👁</button>
-            </div>
-            <a href="#" className="forgot-link">Forgot password?</a>
-            <button type="submit" className="btn-primary">Login to Admin</button>
-          </form>
+
+          {!mfaPendingToken ? (
+            <>
+              <h2>Admin Login</h2>
+              <p className="auth-sub spaced">Sign in to access the administrator dashboard</p>
+              {error && <p className="auth-error">{error}</p>}
+              <form onSubmit={handleSubmit}>
+                <div className="form-group">
+                  <label>Email:</label>
+                  <input
+                    type="email" placeholder="admin@gmail.com" required
+                    value={email} onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+                <div className="form-group password-wrap">
+                  <label>Password:</label>
+                  <input
+                    type={showPw ? 'text' : 'password'} placeholder="Enter your password" required
+                    value={password} onChange={(e) => setPassword(e.target.value)}
+                  />
+                  <button type="button" className="toggle-pw" onClick={() => setShowPw(!showPw)}>👁</button>
+                </div>
+                <a href="#" className="forgot-link">Forgot password?</a>
+                <button type="submit" className="btn-primary" disabled={submitting}>
+                  {submitting ? 'Signing in…' : 'Login to Admin'}
+                </button>
+              </form>
+            </>
+          ) : (
+            <>
+              <h2>Two-step verification</h2>
+              <p className="auth-sub spaced">Enter the 6-digit code from your authenticator app</p>
+              {error && <p className="auth-error">{error}</p>}
+              <form onSubmit={handleMfaSubmit}>
+                <div className="form-group">
+                  <label>Authentication code:</label>
+                  <input
+                    type="text" inputMode="numeric" placeholder="123456" required
+                    value={mfaCode} onChange={(e) => setMfaCode(e.target.value)}
+                  />
+                </div>
+                <button type="submit" className="btn-primary" disabled={submitting}>
+                  {submitting ? 'Verifying…' : 'Verify & log in'}
+                </button>
+                <button type="button" className="btn-secondary" onClick={() => { setMfaPendingToken(null); setError('') }}>
+                  ← Back
+                </button>
+              </form>
+            </>
+          )}
         </div>
       </div>
       <Footer />
