@@ -17,6 +17,7 @@ import {
   createAppointment,
   listDoctors,
   checkAvailability,
+  listVaccinations,
   setupMfa,
   confirmMfa,
   disableMfa,
@@ -172,15 +173,33 @@ function ChildRecordModal({ child, onClose, onRebook, getChildAppointments }) {
               <p className="kcmr-empty">No vaccinations on record yet.</p>
             ) : (
               <div className="kcmr-list">
-                {child.vaccinations.map((v, i) => (
-                  <div className="kcmr-list-item" key={i}>
-                    <div className="kcmr-list-icon"><Syringe size={15} /></div>
-                    <div className="kcmr-list-main">
-                      <div className="kcmr-list-title">{v}</div>
+                {child.vaccinations.map((v, i) => {
+                  const vName = typeof v === 'string' ? v : (v.vaccine_name || v.vaccine || 'Pediatric Vaccine')
+                  const doseStr = typeof v === 'object' && v.dose_number ? ` · Dose ${v.dose_number}` : ''
+                  const docStr = typeof v === 'object' && v.doctor_name ? ` · Administered by ${v.doctor_name}` : ''
+                  const adminStr = typeof v === 'object' && v.date_administered ? `Given: ${v.date_administered}` : ''
+                  const nextDueStr = typeof v === 'object' && v.next_due_date ? `Next Due: ${v.next_due_date}` : ''
+                  const subText = [adminStr, nextDueStr, docStr].filter(Boolean).join(' | ')
+                  const isPending = typeof v === 'object' ? (v.status === 'Pending' || (v.next_due_date && v.next_due_date !== '—')) : false
+                  return (
+                    <div className="kcmr-list-item" key={typeof v === 'object' ? v.id || i : i}>
+                      <div className="kcmr-list-icon"><Syringe size={15} /></div>
+                      <div className="kcmr-list-main" style={{ flex: 1, minWidth: 0 }}>
+                        <div className="kcmr-list-title" style={{ fontWeight: 700, fontSize: '13px' }}>
+                          {vName}{doseStr}
+                        </div>
+                        {subText && (
+                          <div className="kcmr-list-sub" style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
+                            {subText}
+                          </div>
+                        )}
+                      </div>
+                      <span className={`kcmr-pill ${isPending ? 'warn' : 'ok'}`}>
+                        {isPending ? 'Pending' : 'Completed'}
+                      </span>
                     </div>
-                    <span className="kcmr-pill ok">Completed</span>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
@@ -341,9 +360,10 @@ export default function Dashboard() {
 
   // Converts a backend patient row into the shape the existing UI expects.
   // Weight and height come from the latest medical_records row.
-  // Allergies and vaccinations still aren't connected.
-  function toChildShape(p) {
+  // Live connected to backend medical records and vaccinations
+  function toChildShape(p, vaxList = []) {
     const metrics = readChildMetrics()[String(p.id)] || {}
+    const childVax = (vaxList || []).filter((v) => sameId(v.patient_id, p.id))
     return {
       id: p.id,
       name: p.patient_name,
@@ -357,7 +377,7 @@ export default function Dashboard() {
       weight: formatKg(p.weight != null ? p.weight : metrics.weight),
       height: formatCm(p.height != null ? p.height : metrics.height),
       allergies: 'None known',
-      vaccinations: [],
+      vaccinations: childVax,
     }
   }
 
@@ -366,8 +386,11 @@ export default function Dashboard() {
     setPatientsLoading(true)
     setPatientsError('')
     try {
-      const patients = await listMyPatients(accessToken)
-      setChildren(patients.map(toChildShape))
+      const [patients, vaxList] = await Promise.all([
+        listMyPatients(accessToken),
+        listVaccinations(accessToken).catch(() => []),
+      ])
+      setChildren((patients || []).map((p) => toChildShape(p, vaxList)))
     } catch (err) {
       setPatientsError(err.message || 'Could not load patients.')
     } finally {

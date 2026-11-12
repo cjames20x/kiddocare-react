@@ -1931,7 +1931,7 @@ function SectionVaccinations() {
             doctor_id: v.doctor_id,
             date: v.date_administered || '—',
             next_due_date: v.next_due_date || '—',
-            status: v.date_administered ? 'Completed' : 'Pending',
+            status: v.status || (v.next_due_date && v.next_due_date !== '—' ? 'Pending' : 'Completed'),
           };
         }));
       }
@@ -1952,8 +1952,8 @@ function SectionVaccinations() {
 
   async function doAdd(e) {
     e.preventDefault();
-    if (!addF.patient_id || !addF.vaccine_id) {
-      alert('Please select a patient and vaccine from the dropdowns.');
+    if (!addF.patient_id || !addF.vaccine_id || !addF.next_due_date) {
+      alert('Please select a patient, vaccine, and provide the required next due date.');
       return;
     }
     try {
@@ -1963,7 +1963,7 @@ function SectionVaccinations() {
         doctor_id: addF.doctor_id ? Number(addF.doctor_id) : undefined,
         dose_number: Number(addF.dose_number || 1),
         date_administered: addF.date || new Date().toISOString().slice(0, 10),
-        next_due_date: addF.next_due_date || undefined,
+        next_due_date: addF.next_due_date,
       }, token);
       await loadVax();
       setAddF({
@@ -2091,8 +2091,8 @@ function SectionVaccinations() {
               <Inp type="date" value={addF.date} onChange={e=>setAddF({...addF,date:e.target.value})} required/>
             </Field>
           </div>
-          <Field label="Next Due Date:">
-            <Inp type="date" value={addF.next_due_date} onChange={e=>setAddF({...addF,next_due_date:e.target.value})}/>
+          <Field label="Next Due Date: *">
+            <Inp type="date" value={addF.next_due_date} onChange={e=>setAddF({...addF,next_due_date:e.target.value})} required/>
           </Field>
           <SubmitBtn label="Add Vaccination"/>
         </form></div>
