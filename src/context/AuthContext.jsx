@@ -78,7 +78,12 @@ export function AuthProvider({ children }) {
   async function login(username, password) {
     const result = await loginAccount(username, password)
     if (result.mfa_required) {
-      return { mfaRequired: true, mfaPendingToken: result.mfa_pending_token }
+      return {
+        mfaRequired: true,
+        mfaPendingToken: result.mfa_pending_token,
+        emailHint: result.email_hint,
+        devCode: result.dev_code,
+      }
     }
     storeSession(result)
     return { mfaRequired: false, user: result.user }

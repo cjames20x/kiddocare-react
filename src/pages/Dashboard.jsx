@@ -15,6 +15,9 @@ import {
   createAppointment,
   listDoctors,
   checkAvailability,
+  setupMfa,
+  confirmMfa,
+  disableMfa,
 } from '../lib/api.js'
 
 function calcAge(dob) {
@@ -375,49 +378,75 @@ export default function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken])
 
-  // Appointments state (still mock/localStorage — the appointments module
-  // hasn't been connected to the backend yet)
-  const [appointments, setAppointments] = useState(() => {
-    const saved = localStorage.getItem('kiddocare-appointments')
-    if (saved) {
-      try {
-        return JSON.parse(saved)
-      } catch (e) {}
-    }
-    return [
-      {
-        id: 1,
-        childId: 'KC-001',
-        childName: 'your child',
-        service: 'Checkup',
-        date: '2026-10-02',
-        time: '09:00 AM - 10:00 AM',
-        status: 'Confirmed'
+  // Appointments state connected LIVE to Supabase backend
+  const [appointments, setAppointments] = useState([])
+  const [appointmentsLoading, setAppointmentsLoading] = useState(false)
+  const [doctors, setDoctors] = useState([])
+  const [bookedSlots, setBookedSlots] = useState([])
+  const [checkingSlots, setCheckingSlots] = useState(false)
+
+  // MFA Management Modal state
+  const [showMfaModal, setShowMfaModal] = useState(false)
+  const [mfaData, setMfaData] = useState(null)
+  const [mfaCodeInput, setMfaCodeInput] = useState('')
+  const [mfaPasswordInput, setMfaPasswordInput] = useState('')
+  const [mfaStatusMsg, setMfaStatusMsg] = useState('')
+  const [mfaErrorMsg, setMfaErrorMsg] = useState('')
+  const [userMfaEnabled, setUserMfaEnabled] = useState(Boolean(user?.mfaEnabled))
+
+  useEffect(() => {
+    setUserMfaEnabled(Boolean(user?.mfaEnabled))
+  }, [user])
+
+  // Load appointments live from backend
+  async function loadAppointments() {
+    if (!accessToken) return
+    setAppointmentsLoading(true)
+    try {
+      const data = await listAppointments(accessToken)
+      if (Array.isArray(data)) {
+        setAppointments(
+          data.map((a) => ({
+            id: a.id,
+            childId: a.patient_id,
+            childName: a.patient_name || 'Child',
+            doctorId: a.doctor_id,
+            doctorName: a.doctor_name || 'Assigned Doctor',
+            service: a.reason_for_visit || 'General Pediatric Checkup',
+            date: a.appointment_date,
+            time: a.appointment_time ? a.appointment_time.slice(0, 5) : '09:00',
+            status: a.status || 'Pending',
+          }))
+        )
       }
-    ]
-  })
+    } catch (err) {
+      console.warn('Could not load appointments:', err)
+    } finally {
+      setAppointmentsLoading(false)
+    }
+  }
 
-  // Persist appointments to localStorage
-  useEffect(() => {
-    localStorage.setItem('kiddocare-appointments', JSON.stringify(appointments))
-  }, [appointments])
+  // Load doctors list
+  async function loadDoctorsList() {
+    if (!accessToken) return
+    try {
+      const docs = await listDoctors(accessToken)
+      if (Array.isArray(docs)) setDoctors(docs)
+    } catch (err) {
+      console.warn('Could not load doctors:', err)
+    }
+  }
 
-  // Older bookings stored the dropdown id as text, so the name lookup missed
-  // and saved "Unknown". Once patients are loaded, put the real name back.
   useEffect(() => {
-    if (!children.length) return
-    setAppointments((current) => {
-      let changed = false
-      const next = current.map((appt) => {
-        const child = children.find((c) => sameId(c.id, appt.childId))
-        if (!child) return appt
-        if (appt.childId === child.id && appt.childName === child.name) return appt
-        changed = true
-        return { ...appt, childId: child.id, childName: child.name }
-      })
-      return changed ? next : current
-    })
-  }, [children])
+    loadAppointments()
+    loadDoctorsList()
+    // Poll every 5s for real-time live synchronization between admin and user portals
+    const interval = setInterval(() => {
+      loadAppointments()
+      loadPatients()
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [accessToken])
 
   // The shared sidebar switches tabs by navigating to /dashboard with state,
   // so keep activeTab in sync whenever that navigation happens.
@@ -439,12 +468,60 @@ export default function Dashboard() {
 
   // Form states: Book Appointment
   const [bookForm, setBookForm] = useState({
-    childId: children[0]?.id || '',
-    service: 'Checkup',
+    childId: '',
+    doctorId: '',
+    service: 'General Pediatric Checkup',
     date: '',
-    time: '09:00 AM - 10:00 AM',
+    time: '09:00',
     notes: '',
   })
+  const [bookSubmitting, setBookSubmitting] = useState(false)
+
+  // Auto-select first child and first doctor when available
+  useEffect(() => {
+    if (!bookForm.childId && children.length > 0) {
+      setBookForm((prev) => ({ ...prev, childId: children[0].id }))
+    }
+  }, [children])
+
+  useEffect(() => {
+    if (!bookForm.doctorId && doctors.length > 0) {
+      setBookForm((prev) => ({ ...prev, doctorId: doctors[0].id }))
+    }
+  }, [doctors])
+
+  // Check slot availability when doctor & date change
+  useEffect(() => {
+    if (!bookForm.doctorId || !bookForm.date || !accessToken) {
+      setBookedSlots([])
+      return
+    }
+    let active = true
+    async function checkSlots() {
+      setCheckingSlots(true)
+      try {
+        const res = await checkAvailability(bookForm.doctorId, bookForm.date, accessToken)
+        if (active) {
+          const booked = (res?.booked_times || []).map((t) => String(t).slice(0, 5))
+          setBookedSlots(booked)
+          if (booked.includes(bookForm.time)) {
+            // Find first unbooked slot
+            const allSlots = ['09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00']
+            const free = allSlots.find((s) => !booked.includes(s))
+            if (free) setBookForm((prev) => ({ ...prev, time: free }))
+          }
+        }
+      } catch (err) {
+        if (active) setBookedSlots([])
+      } finally {
+        if (active) setCheckingSlots(false)
+      }
+    }
+    checkSlots()
+    return () => {
+      active = false
+    }
+  }, [bookForm.doctorId, bookForm.date, accessToken])
 
   // Handle Child Registration
   async function handleRegisterChild(e) {
@@ -515,29 +592,33 @@ export default function Dashboard() {
     }
   }
 
-  // Handle Book Appointment
-  function handleBookAppointment(e) {
+  // Handle Book Appointment -> writes live to Supabase!
+  async function handleBookAppointment(e) {
     e.preventDefault()
-    if (!bookForm.childId || !bookForm.date) {
-      alert('Please select a child and preferred appointment date.')
+    if (!bookForm.childId || !bookForm.date || !bookForm.doctorId || !bookForm.time) {
+      alert('Please select a child, doctor, preferred date, and time slot.')
       return
     }
 
-    const child = children.find((c) => sameId(c.id, bookForm.childId))
-    const newAppt = {
-      id: Date.now(),
-      childId: child ? child.id : bookForm.childId,
-      childName: child ? child.name : 'Unknown',
-      service: bookForm.service,
-      date: bookForm.date,
-      time: bookForm.time,
-      notes: bookForm.notes,
-      status: 'Confirmed'
-    }
+    try {
+      setBookSubmitting(true)
+      const payload = {
+        patient_id: Number(bookForm.childId),
+        doctor_id: Number(bookForm.doctorId),
+        appointment_date: bookForm.date,
+        appointment_time: bookForm.time.length === 5 ? `${bookForm.time}:00` : bookForm.time,
+        reason_for_visit: `${bookForm.service}${bookForm.notes ? ': ' + bookForm.notes : ''}`,
+      }
 
-    setAppointments([newAppt, ...appointments])
-    alert('Appointment successfully booked!')
-    setActiveTab('Appointments')
+      await createAppointment(payload, accessToken)
+      alert('Appointment successfully booked! It is now pending clinic confirmation.')
+      await loadAppointments()
+      setActiveTab('Appointments')
+    } catch (err) {
+      alert(err.message || 'Could not book appointment. Please try another slot.')
+    } finally {
+      setBookSubmitting(false)
+    }
   }
 
   // Get this child's appointments, most relevant (soonest upcoming) first
@@ -629,9 +710,38 @@ export default function Dashboard() {
         {/* Topbar */}
         <div className="dash-topbar">
           <h1 className="dash-title">{activeTab.toUpperCase()}</h1>
-          <div className="dash-bell">
-            <Bell size={20} />
-            <span className="dash-bell-dot"></span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button
+              type="button"
+              onClick={() => {
+                setShowMfaModal(true);
+                setMfaStatusMsg('');
+                setMfaErrorMsg('');
+                setMfaData(null);
+                setMfaCodeInput('');
+                setMfaPasswordInput('');
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                borderRadius: '8px',
+                border: '1px solid #cbd5e1',
+                background: userMfaEnabled ? '#ecfdf5' : '#f8fafc',
+                color: userMfaEnabled ? '#059669' : '#475569',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              <ShieldCheck size={16} color={userMfaEnabled ? '#059669' : '#64748b'} />
+              {userMfaEnabled ? 'MFA: Enabled' : 'MFA: Disabled'}
+            </button>
+            <div className="dash-bell">
+              <Bell size={20} />
+              <span className="dash-bell-dot"></span>
+            </div>
           </div>
         </div>
 
@@ -712,54 +822,60 @@ export default function Dashboard() {
               <table className="dash-table">
                 <thead>
                   <tr>
-                    <th>PatientId</th>
-                    <th>Name</th>
-                    <th>Age</th>
-                    <th>Gender</th>
-                    <th>Next Visit</th>
-                    <th>Parent/Guardian</th>
-                    <th style={{ textAlign: 'center' }}>Actions</th>
+                    <th>Patient Name</th>
+                    <th>Doctor</th>
+                    <th>Service / Reason</th>
+                    <th>Date</th>
+                    <th>Time Slot</th>
+                    <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {patientsLoading ? (
-                    <tr><td colSpan={7} style={{ textAlign: 'center', color: '#999', padding: '28px' }}>Loading patients…</td></tr>
-                  ) : patientsError ? (
-                    <tr><td colSpan={7} style={{ textAlign: 'center', color: '#b3412c', padding: '28px' }}>{patientsError}</td></tr>
-                  ) : filteredChildren.length === 0 ? (
+                  {appointmentsLoading ? (
                     <tr>
-                      <td colSpan={7} style={{ textAlign: 'center', color: '#999', padding: '28px' }}>
-                        No children registered yet.
+                      <td colSpan={6} style={{ textAlign: 'center', color: '#0284c7', padding: '24px' }}>
+                        Loading live appointments from database…
+                      </td>
+                    </tr>
+                  ) : appointments.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} style={{ textAlign: 'center', color: '#999', padding: '24px' }}>
+                        No appointments booked yet. Click "+ Book Another Appointment" below to schedule.
                       </td>
                     </tr>
                   ) : (
-                    filteredChildren.map((c) => (
-                      <tr key={c.id}>
-                        <td><strong>{c.id}</strong></td>
-                        <td style={{ fontWeight: 600, color: 'var(--blue)' }}>{c.name}</td>
-                        <td>{c.age}</td>
-                        <td>{c.gender}</td>
-                        <td>{getNextVisit(c.id)}</td>
-                        <td>{c.guardian}</td>
-                        <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                          <button
-                            className="dash-action-btn btn-action-book"
-                            onClick={() => {
-                              setBookForm((prev) => ({ ...prev, childId: c.id }))
-                              setActiveTab('Book Appointments')
-                            }}
-                          >
-                            Rebook
-                          </button>
-                          <button
-                            className="dash-action-btn btn-action-view"
-                            onClick={() => setLegacyViewChild(c)}
-                          >
-                            View
-                          </button>
-                        </td>
-                      </tr>
-                    ))
+                    appointments.map((a) => {
+                      const st = String(a.status || 'Pending').toLowerCase();
+                      let badgeStyle = {
+                        padding: '4px 10px',
+                        borderRadius: '12px',
+                        fontWeight: 700,
+                        fontSize: '12px',
+                        background: '#fef3c7',
+                        color: '#b45309',
+                      };
+                      if (st === 'confirmed') {
+                        badgeStyle = { padding: '4px 10px', borderRadius: '12px', fontWeight: 700, fontSize: '12px', background: '#e0f2fe', color: '#0369a1' };
+                      } else if (st === 'completed') {
+                        badgeStyle = { padding: '4px 10px', borderRadius: '12px', fontWeight: 700, fontSize: '12px', background: '#dcfce7', color: '#15803d' };
+                      } else if (st === 'cancelled') {
+                        badgeStyle = { padding: '4px 10px', borderRadius: '12px', fontWeight: 700, fontSize: '12px', background: '#fee2e2', color: '#b91c1c' };
+                      }
+                      return (
+                        <tr key={a.id}>
+                          <td><strong>{a.childName}</strong></td>
+                          <td>{a.doctorName}</td>
+                          <td>{formatServiceName(a.service)}</td>
+                          <td>{a.date}</td>
+                          <td>{a.time}</td>
+                          <td>
+                            <span style={badgeStyle}>
+                              {a.status || 'Pending'}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -1003,89 +1119,124 @@ export default function Dashboard() {
 
               <div className="appointment-main">
               <form className="appointment-form" onSubmit={handleBookAppointment}>
-                <div className="form-group">
-                  <label>
-                    Select Child / Patient: <span className="required">*</span>
-                  </label>
-                  <select
-                    value={bookForm.childId}
-                    onChange={(e) => setBookForm({ ...bookForm, childId: e.target.value })}
-                    required
-                  >
-                    <option value="" disabled>-- Select a registered child --</option>
-                    {children.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} ({c.id})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="form-row">
                   <div className="form-group">
                     <label>
-                      Service: <span className="required">*</span>
+                      Select Child / Patient: <span className="required">*</span>
                     </label>
                     <select
-                      value={bookForm.service}
-                      onChange={(e) => setBookForm({ ...bookForm, service: e.target.value })}
-                    >
-                      <option value="Checkup">General Pediatric Checkup</option>
-                      <option value="Vaccination">Vaccination / Immunization</option>
-                      <option value="Growth Assessment">Growth Assessment</option>
-                      <option value="Consultation">Urgent Consultation</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>
-                      Preferred Date: <span className="required">*</span>
-                    </label>
-                    <input
-                      type="date"
-                      min={todayLocal()}
-                      value={bookForm.date}
-                      onChange={(e) => setBookForm({ ...bookForm, date: e.target.value })}
+                      value={bookForm.childId}
+                      onChange={(e) => setBookForm({ ...bookForm, childId: e.target.value })}
                       required
-                    />
-                  </div>
-                </div>
-
-                <div className="form-row">
-                  <div className="form-group">
-                    <label>Time Slot:</label>
-                    <select
-                      value={bookForm.time}
-                      onChange={(e) => setBookForm({ ...bookForm, time: e.target.value })}
                     >
-                      <option value="09:00 AM - 10:00 AM">09:00 AM - 10:00 AM</option>
-                      <option value="10:30 AM - 11:30 AM">10:30 AM - 11:30 AM</option>
-                      <option value="01:00 PM - 02:00 PM">01:00 PM - 02:00 PM</option>
-                      <option value="03:00 PM - 04:00 PM">03:00 PM - 04:00 PM</option>
+                      <option value="" disabled>-- Select a registered child --</option>
+                      {children.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} (ID: {c.id})
+                        </option>
+                      ))}
                     </select>
                   </div>
+
                   <div className="form-group">
-                    <label>Guardian / Contact:</label>
+                    <label>
+                      Select Pediatrician / Doctor: <span className="required">*</span>
+                    </label>
+                    <select
+                      value={bookForm.doctorId}
+                      onChange={(e) => setBookForm({ ...bookForm, doctorId: e.target.value })}
+                      required
+                    >
+                      <option value="" disabled>-- Choose a Doctor --</option>
+                      {doctors.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.doctor_name || `Dr. Specialist #${d.id}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>
+                        Service / Reason: <span className="required">*</span>
+                      </label>
+                      <select
+                        value={bookForm.service}
+                        onChange={(e) => setBookForm({ ...bookForm, service: e.target.value })}
+                      >
+                        <option value="General Pediatric Checkup">General Pediatric Checkup</option>
+                        <option value="Vaccination & Immunization">Vaccination & Immunization</option>
+                        <option value="Growth & Developmental Assessment">Growth & Developmental Assessment</option>
+                        <option value="Urgent Consultation">Urgent Consultation</option>
+                        <option value="Nutrition Counseling">Nutrition Counseling</option>
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>
+                        Preferred Date: <span className="required">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        min={todayLocal()}
+                        value={bookForm.date}
+                        onChange={(e) => setBookForm({ ...bookForm, date: e.target.value })}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>
+                        Time Slot: {checkingSlots && <span style={{ fontSize: '11px', color: '#0284c7' }}>checking availability…</span>}
+                      </label>
+                      <select
+                        value={bookForm.time}
+                        onChange={(e) => setBookForm({ ...bookForm, time: e.target.value })}
+                      >
+                        {[
+                          { val: '09:00', label: '09:00 AM - 10:00 AM' },
+                          { val: '10:00', label: '10:00 AM - 11:00 AM' },
+                          { val: '11:00', label: '11:00 AM - 12:00 PM' },
+                          { val: '13:00', label: '01:00 PM - 02:00 PM' },
+                          { val: '14:00', label: '02:00 PM - 03:00 PM' },
+                          { val: '15:00', label: '03:00 PM - 04:00 PM' },
+                          { val: '16:00', label: '04:00 PM - 05:00 PM' },
+                        ].map((slot) => {
+                          const isBooked = bookedSlots.includes(slot.val);
+                          return (
+                            <option key={slot.val} value={slot.val} disabled={isBooked}>
+                              {slot.label} {isBooked ? '(Booked - Unavailable)' : '✓ Open'}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>Parent / Guardian:</label>
+                      <input
+                        type="text"
+                        value={user?.guardianName || 'Parent / Guardian'}
+                        readOnly
+                        disabled
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Notes / Symptoms (Optional):</label>
                     <input
                       type="text"
-                      value={user?.guardianName || 'Parent / Guardian'}
-                      readOnly
-                      disabled
+                      placeholder="e.g. Mild fever since yesterday, routine booster vaccine"
+                      value={bookForm.notes}
+                      onChange={(e) => setBookForm({ ...bookForm, notes: e.target.value })}
                     />
                   </div>
-                </div>
 
-                <div className="form-group">
-                  <label>Notes / Symptoms (Optional):</label>
-                  <input
-                    type="text"
-                    placeholder="Enter any symptoms or questions for the doctor..."
-                    value={bookForm.notes}
-                    onChange={(e) => setBookForm({ ...bookForm, notes: e.target.value })}
-                  />
-                </div>
-
-                <button type="submit" className="btn-book">Confirm Appointment</button>
-              </form>
+                  <button type="submit" className="btn-book" disabled={bookSubmitting}>
+                    {bookSubmitting ? 'Booking with Clinic…' : 'Confirm & Book Appointment'}
+                  </button>
+                </form>
               </div>
             </div>
           </div>
@@ -1163,6 +1314,187 @@ export default function Dashboard() {
           </div>
         )}
       </main>
+
+      {/* MFA MANAGEMENT MODAL */}
+      {showMfaModal && (
+        <div
+          className="confirm-overlay"
+          onClick={() => setShowMfaModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+          }}
+        >
+          <div
+            className="confirm-box"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#fff',
+              borderRadius: '12px',
+              padding: '24px',
+              maxWidth: '460px',
+              width: '90%',
+              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ShieldCheck size={22} color="#0284c7" /> Two-Factor Authentication (MFA)
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowMfaModal(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {mfaStatusMsg && (
+              <div style={{ padding: '10px 14px', background: '#ecfdf5', color: '#065f46', borderRadius: '6px', marginBottom: '14px', fontSize: '13px' }}>
+                {mfaStatusMsg}
+              </div>
+            )}
+            {mfaErrorMsg && (
+              <div style={{ padding: '10px 14px', background: '#fef2f2', color: '#991b1b', borderRadius: '6px', marginBottom: '14px', fontSize: '13px' }}>
+                {mfaErrorMsg}
+              </div>
+            )}
+
+            {!userMfaEnabled ? (
+              <div>
+                {!mfaData ? (
+                  <div>
+                    <p style={{ color: '#475569', fontSize: '14px', lineHeight: 1.5, marginBottom: '18px' }}>
+                      Add an extra layer of security to your KiddoCare guardian account. Once enabled, you will need a 6-digit TOTP code from your authenticator app (Google Authenticator, Authy, Microsoft Authenticator) whenever you sign in.
+                    </p>
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      style={{ width: '100%' }}
+                      onClick={async () => {
+                        setMfaErrorMsg('');
+                        try {
+                          const res = await setupMfa(accessToken);
+                          setMfaData(res);
+                        } catch (err) {
+                          setMfaErrorMsg(err.message || 'Failed to start MFA setup.');
+                        }
+                      }}
+                    >
+                      Begin MFA Setup
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <p style={{ fontSize: '13px', color: '#475569', marginBottom: '12px' }}>
+                      Scan the QR code below with your Authenticator app, then enter the generated 6-digit code:
+                    </p>
+                    <div style={{ textAlign: 'center', marginBottom: '14px' }}>
+                      <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(mfaData.otpauth_url)}&size=180x180`}
+                        alt="MFA QR Code"
+                        style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '6px' }}
+                      />
+                      <div style={{ marginTop: '6px', fontSize: '12px', color: '#64748b' }}>
+                        Manual key: <code style={{ fontWeight: 700, letterSpacing: '1px' }}>{mfaData.secret}</code>
+                      </div>
+                    </div>
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        setMfaErrorMsg('');
+                        try {
+                          await confirmMfa(mfaCodeInput.trim(), accessToken);
+                          setUserMfaEnabled(true);
+                          setMfaStatusMsg('Two-Factor Authentication is now enabled for your account!');
+                          setMfaData(null);
+                        } catch (err) {
+                          setMfaErrorMsg(err.message || 'Invalid code. Check your authenticator app.');
+                        }
+                      }}
+                    >
+                      <div className="form-group" style={{ marginBottom: '14px' }}>
+                        <label style={{ fontSize: '13px', fontWeight: 600 }}>6-Digit Verification Code:</label>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={6}
+                          placeholder="e.g. 123456"
+                          required
+                          value={mfaCodeInput}
+                          onChange={(e) => setMfaCodeInput(e.target.value)}
+                          style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '16px', letterSpacing: '2px', textAlign: 'center' }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <button type="submit" className="btn-primary" style={{ flex: 1 }}>
+                          Verify & Activate
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          onClick={() => setMfaData(null)}
+                          style={{ padding: '8px 14px' }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', background: '#ecfdf5', borderRadius: '8px', marginBottom: '16px' }}>
+                  <ShieldCheck size={24} color="#059669" />
+                  <div>
+                    <strong style={{ color: '#065f46', fontSize: '14px' }}>MFA is currently active</strong>
+                    <div style={{ color: '#047857', fontSize: '12px' }}>Your account is protected with two-step verification.</div>
+                  </div>
+                </div>
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!mfaPasswordInput) return;
+                    setMfaErrorMsg('');
+                    try {
+                      await disableMfa(mfaPasswordInput, accessToken);
+                      setUserMfaEnabled(false);
+                      setMfaPasswordInput('');
+                      setMfaStatusMsg('Two-Factor Authentication has been disabled.');
+                    } catch (err) {
+                      setMfaErrorMsg(err.message || 'Incorrect password.');
+                    }
+                  }}
+                >
+                  <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '8px' }}>
+                    To disable MFA, enter your account password to confirm:
+                  </p>
+                  <div className="form-group" style={{ marginBottom: '14px' }}>
+                    <input
+                      type="password"
+                      placeholder="Enter your account password"
+                      required
+                      value={mfaPasswordInput}
+                      onChange={(e) => setMfaPasswordInput(e.target.value)}
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                    />
+                  </div>
+                  <button type="submit" className="btn-primary" style={{ width: '100%', background: '#dc2626' }}>
+                    Disable Two-Factor Authentication
+                  </button>
+                </form>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* DASHBOARD TAB — quick view popup (same design as Child Information's) */}
       {legacyViewChild && (

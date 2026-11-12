@@ -104,4 +104,49 @@ export const updateAppointmentStatus = (id, status, token) =>
 export const rescheduleAppointment = (id, payload, token) =>
   request(`/api/appointments/${id}`, { method: 'PATCH', body: payload, token })
 
+// ---- MFA Setup & Management ----
+export const setupMfa = (token) =>
+  request('/api/auth/mfa/setup', { method: 'POST', token })
+
+export const confirmMfa = (code, token) =>
+  request('/api/auth/mfa/confirm', { method: 'POST', body: { code }, token })
+
+export const disableMfa = (password, token) =>
+  request('/api/auth/mfa/disable', { method: 'POST', body: { password }, token })
+
+// ---- User Management (Admin) ----
+export const listUsers = (token) => request('/api/auth/users', { token })
+export const updateUserStatus = (id, is_active, token) =>
+  request(`/api/auth/users/${id}/status`, { method: 'PATCH', body: { is_active }, token })
+
+// ---- Payments ----
+export const listPayments = (token, query = {}) => {
+  const params = new URLSearchParams()
+  if (query.status) params.set('status', query.status)
+  if (query.start_date && query.end_date) {
+    params.set('start_date', query.start_date)
+    params.set('end_date', query.end_date)
+  }
+  const qs = params.toString()
+  return request(`/api/payments${qs ? `?${qs}` : ''}`, { token })
+}
+export const getPaymentSummary = (token) => request('/api/payments/reports/summary', { token })
+export const recordPayment = (id, payload, token) =>
+  request(`/api/payments/${id}/pay`, { method: 'PATCH', body: payload, token })
+
+// ---- Vaccinations ----
+export const listVaccines = (token) => request('/api/vaccinations/vaccines', { token })
+export const listUpcomingVaccinations = (token, withinDays = 30) =>
+  request(`/api/vaccinations/due?within_days=${withinDays}`, { token })
+export const listVaccinationsByPatient = (patientId, token) =>
+  request(`/api/vaccinations/patient/${patientId}`, { token })
+export const createVaccination = (payload, token) =>
+  request('/api/vaccinations', { method: 'POST', body: payload, token })
+
+// ---- Medical Records ----
+export const listMedicalRecordsByPatient = (patientId, token) =>
+  request(`/api/medical-records/patient/${patientId}`, { token })
+export const createMedicalRecord = (payload, token) =>
+  request('/api/medical-records', { method: 'POST', body: payload, token })
+
 export { ApiError, API_BASE }

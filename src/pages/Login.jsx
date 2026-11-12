@@ -16,6 +16,7 @@ export default function Login() {
   // Set once the backend says this account needs a second factor.
   const [mfaPendingToken, setMfaPendingToken] = useState(null)
   const [mfaCode, setMfaCode] = useState('')
+  const [emailHint, setEmailHint] = useState('')
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -91,7 +92,7 @@ export default function Login() {
           ) : (
             <>
               <h2>Two-step verification</h2>
-              <p className="auth-sub spaced">Enter the 6-digit code from your authenticator app</p>
+              <p className="auth-sub spaced">Enter the 6-digit verification code sent to {emailHint || 'your email'}</p>
               {error && <p className="auth-error">{error}</p>}
               <form onSubmit={handleMfaSubmit}>
                 <div className="form-group">
