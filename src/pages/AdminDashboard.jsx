@@ -513,6 +513,7 @@ function SectionUserMgmt() {
 
 function SectionPatientMgmt() {
   const { accessToken } = useAuth();
+  const { addNotification } = useNotifications();
   const token = accessToken || localStorage.getItem('kiddocare-token') || DEMO_ADMIN_TOKEN;
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -579,6 +580,15 @@ function SectionPatientMgmt() {
         },
         token
       );
+      if (addNotification) {
+        addNotification({
+          type: 'Visits',
+          title: 'Patient Intake Completed',
+          child: addF.name.trim(),
+          description: `Patient ${addF.name.trim()} was registered into patient records.`,
+          tone: 'blue',
+        });
+      }
       await loadLivePatients();
       setAddF({ name: '', age: '2020-01-01', gender: 'Male', address: '', nextVisit: '', guardian: '' });
       setShowAdd(false);
@@ -601,6 +611,15 @@ function SectionPatientMgmt() {
         },
         token
       );
+      if (addNotification) {
+        addNotification({
+          type: 'Visits',
+          title: 'Patient Record Updated',
+          child: editF.name.trim(),
+          description: `Patient records for ${editF.name.trim()} were updated.`,
+          tone: 'blue',
+        });
+      }
       await loadLivePatients();
       setEditP(null);
     } catch (err) {
@@ -857,7 +876,7 @@ function formatTimeDisplay(t) {
 
 function SectionAppointments() {
   const { accessToken } = useAuth();
-  const { addNotification } = useNotifications();
+  const { addNotification, syncAdminUpdates } = useNotifications();
   const token = accessToken || localStorage.getItem('kiddocare-token') || DEMO_ADMIN_TOKEN;
 
   const [rows, setRows] = useState([]);
@@ -948,7 +967,9 @@ function SectionAppointments() {
       }
 
       const data = await listAppointments(token, queryParams);
-      setRows(Array.isArray(data) ? data : []);
+      const appts = Array.isArray(data) ? data : [];
+      setRows(appts);
+      if (syncAdminUpdates) syncAdminUpdates({ appointments: appts });
     } catch (err) {
       setError(err.message || 'Could not load appointments.');
     } finally {
@@ -1886,6 +1907,7 @@ function SectionAppointments() {
 
 function SectionVaccinations() {
   const { accessToken } = useAuth();
+  const { addNotification } = useNotifications();
   const token = accessToken || localStorage.getItem('kiddocare-token') || DEMO_ADMIN_TOKEN;
   const [rows, setRows]     = useState(INIT_VACC);
   const [patients, setPatients] = useState([]);
@@ -1965,6 +1987,17 @@ function SectionVaccinations() {
         date_administered: addF.date || new Date().toISOString().slice(0, 10),
         next_due_date: addF.next_due_date,
       }, token);
+      const pat = patients.find(p => String(p.id) === String(addF.patient_id));
+      const vac = vaccines.find(v => String(v.id) === String(addF.vaccine_id));
+      if (addNotification) {
+        addNotification({
+          type: 'Vaccines',
+          title: 'Vaccination Administered',
+          child: pat?.patient_name || `Patient #${addF.patient_id}`,
+          description: `Dose ${addF.dose_number || 1} of ${vac?.vaccine_name || 'Vaccine'} recorded. Next dose due: ${addF.next_due_date}.`,
+          tone: 'mint',
+        });
+      }
       await loadVax();
       setAddF({
         patient_id: '',

@@ -1,167 +1,206 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
 import { CalendarDays, CreditCard, Edit3, Syringe, Bell } from 'lucide-react'
 import { useAuth } from './AuthContext.jsx'
 
-const GUARDIAN_NOTIFICATIONS = [
-  {
-    id: 1,
-    type: 'Visits',
-    title: 'Routine Growth Checkup',
-    child: 'Sophia',
-    description: 'Sophia has a routine growth checkup scheduled with Dr. Reyes tomorrow at 9:30 AM.',
-    time: '15 minutes ago',
-    icon: CalendarDays,
-    tone: 'blue',
-    unread: true,
-  },
-  {
-    id: 2,
-    type: 'Visits',
-    title: 'Missed Clinic Visit Reminder',
-    child: 'Liam',
-    description: 'Liam missed his wellness visit. Please choose a new appointment time when convenient.',
-    time: '1 hour ago',
-    icon: Edit3,
-    tone: 'rose',
-    unread: true,
-  },
-  {
-    id: 3,
-    type: 'Vaccines',
-    title: 'Vaccination Due Soon',
-    child: 'Sophia',
-    description: "Sophia's seasonal flu vaccine is due in 7 days. Book a visit to keep her records current.",
-    time: '3 hours ago',
-    icon: Syringe,
-    tone: 'mint',
-    unread: true,
-  },
-  {
-    id: 4,
-    type: 'Bills',
-    title: 'Payment Received Successfully',
-    child: 'Liam',
-    description: "Your payment of ₱1,200 for Liam's clinic visit has been received and applied to your account.",
-    time: 'Yesterday',
-    icon: CreditCard,
-    tone: 'gold',
-    unread: true,
-  },
-  {
-    id: 5,
-    type: 'Vaccines',
-    title: 'Immunization Record Updated',
-    child: 'Sophia',
-    description: "Sophia's immunization record was updated after her appointment with Dr. Reyes.",
-    time: 'Yesterday',
-    icon: Syringe,
-    tone: 'mint',
-    unread: false,
-  },
-  {
-    id: 6,
-    type: 'Bills',
-    title: 'Balance Statement Ready',
-    child: 'Liam',
-    description: 'Your latest KiddoCare balance statement is ready to review in your account.',
-    time: '2 days ago',
-    icon: CreditCard,
-    tone: 'gold',
-    unread: false,
-  },
-]
-
-const STAFF_NOTIFICATIONS = [
-  {
-    id: 101,
-    type: 'Visits',
-    title: 'New Appointment Scheduled',
-    child: 'Lhea Santos',
-    description: 'Guardian Emma Santos scheduled a pediatric checkup with Dra. Maury V. Reyes.',
-    time: '10 minutes ago',
-    icon: CalendarDays,
-    tone: 'blue',
-    unread: true,
-  },
-  {
-    id: 102,
-    type: 'Visits',
-    title: 'Appointment Cancelled',
-    child: 'Johny Tan',
-    description: 'Guardian Felicia Tan requested cancellation for the Aug 20 consultation.',
-    time: '40 minutes ago',
-    icon: Edit3,
-    tone: 'rose',
-    unread: true,
-  },
-  {
-    id: 103,
-    type: 'Vaccines',
-    title: 'Vaccine Inventory Alert',
-    child: 'Clinic Supply',
-    description: 'Infanrix Hexa stock has dropped below minimum threshold (12 doses remaining).',
-    time: '2 hours ago',
-    icon: Syringe,
-    tone: 'mint',
-    unread: true,
-  },
-  {
-    id: 104,
-    type: 'Bills',
-    title: 'Payment Confirmed',
-    child: 'Kyla Mae Yap',
-    description: 'Received ₱1,500 consultation payment via GCash. Invoice #KC-INV-204 verified.',
-    time: '3 hours ago',
-    icon: CreditCard,
-    tone: 'gold',
-    unread: true,
-  },
-  {
-    id: 105,
-    type: 'Visits',
-    title: 'Patient Intake Completed',
-    child: 'Sofia Andrade',
-    description: 'Guardian Justine Andrade completed registration and updated clinic records.',
-    time: 'Yesterday',
-    icon: CalendarDays,
-    tone: 'blue',
-    unread: false,
-  },
-]
-
 const NotificationContext = createContext(null)
 
+export function getNotificationIcon(type) {
+  switch (type) {
+    case 'Visits': return CalendarDays
+    case 'Vaccines': return Syringe
+    case 'Bills': return CreditCard
+    default: return Bell
+  }
+}
+
 export function NotificationProvider({ children }) {
+  let authUser = null
   let isStaff = false
   try {
     const auth = useAuth()
+    authUser = auth?.user
     isStaff = Boolean(auth?.isStaff)
   } catch (e) {
-    // In case provider used outside AuthContext
+    // In case provider rendered outside AuthContext
   }
 
-  const [notifications, setNotifications] = useState(() => (isStaff ? STAFF_NOTIFICATIONS : GUARDIAN_NOTIFICATIONS))
-  const [isOpen, setIsOpen] = useState(false)
+  // Isolated per-user storage key (ensures notifications are never centralized)
+  const userKey = useMemo(() => {
+    if (!authUser) return isStaff ? 'admin_staff' : 'user_guest'
+    const id = authUser.id || authUser.user_id || authUser.username || authUser.email || 'guest'
+    return `${isStaff ? 'admin' : 'guardian'}_${id}`
+  }, [authUser, isStaff])
 
-  useEffect(() => {
-    setNotifications(isStaff ? STAFF_NOTIFICATIONS : GUARDIAN_NOTIFICATIONS)
-  }, [isStaff])
+  const storageKey = `kiddocare_notifs_${userKey}`
 
-  const unreadCount = notifications.filter((notification) => notification.unread).length
-
-  const addNotification = (notif) => {
-    setNotifications((prev) => [
+  // Initial template when a user has no stored notifications yet
+  const getDefaultNotifications = useCallback(() => {
+    if (isStaff) {
+      return [
+        {
+          id: Date.now(),
+          key: 'clinic-welcome',
+          type: 'Visits',
+          title: 'Clinic Admin Connected',
+          child: 'Staff Operations',
+          description: 'Staff portal connected to Supabase live database. Operational events will appear here.',
+          time: 'Just now',
+          tone: 'blue',
+          unread: false,
+        }
+      ]
+    }
+    return [
       {
         id: Date.now(),
+        key: 'guardian-welcome',
+        type: 'Visits',
+        title: 'Welcome to KiddoCare',
+        child: authUser?.guardianName || authUser?.username || 'Guardian',
+        description: 'Your account is ready. Track your registered children, clinic checkups, and vaccinations here.',
+        time: 'Just now',
+        tone: 'blue',
+        unread: true,
+      }
+    ]
+  }, [authUser, isStaff])
+
+  const [notifications, setNotifications] = useState(() => {
+    try {
+      const saved = localStorage.getItem(storageKey)
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed
+      }
+    } catch (e) {
+      console.warn('Could not read user notifications:', e)
+    }
+    return getDefaultNotifications()
+  })
+
+  // Whenever logged-in account changes, load that specific user's notifications
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(storageKey)
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setNotifications(parsed)
+          return
+        }
+      }
+    } catch (e) {}
+    setNotifications(getDefaultNotifications())
+  }, [storageKey, getDefaultNotifications])
+
+  // Save changes isolated to this specific user's localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(notifications))
+    } catch (e) {
+      console.warn('Could not persist user notifications:', e)
+    }
+  }, [notifications, storageKey])
+
+  const [isOpen, setIsOpen] = useState(false)
+  const unreadCount = notifications.filter((n) => n.unread).length
+
+  // Add a new live notification for this account
+  const addNotification = useCallback((notif) => {
+    setNotifications((prev) => [
+      {
+        id: Date.now() + Math.floor(Math.random() * 1000),
         unread: true,
         time: 'Just now',
-        icon: notif.icon || (notif.type === 'Visits' ? CalendarDays : notif.type === 'Vaccines' ? Syringe : notif.type === 'Bills' ? CreditCard : Bell),
         tone: notif.tone || (notif.type === 'Visits' ? 'blue' : notif.type === 'Vaccines' ? 'mint' : 'gold'),
         ...notif,
       },
       ...prev,
     ])
-  }
+  }, [])
+
+  // Sync real-time updates for guardian's own children without duplicating
+  const syncUserUpdates = useCallback(({ children = [], appointments = [], vaccinations = [] }) => {
+    setNotifications((prev) => {
+      const existingKeys = new Set(prev.map((n) => n.key).filter(Boolean))
+      const newItems = []
+
+      // 1. Appointments for this guardian's children
+      appointments.forEach((a) => {
+        const key = `user-appt-${a.id}-${a.status || 'Confirmed'}`
+        if (!existingKeys.has(key)) {
+          const childName = a.childName || a.patient_name || 'Child'
+          newItems.push({
+            id: Date.now() + Math.floor(Math.random() * 1000),
+            key,
+            type: 'Visits',
+            title: `Appointment ${a.status || 'Confirmed'}`,
+            child: childName,
+            description: `Appointment for ${childName} on ${a.date || a.appointment_date} at ${a.time || a.appointment_time} is ${a.status || 'Confirmed'}.`,
+            time: 'Latest status',
+            tone: a.status === 'Cancelled' ? 'rose' : a.status === 'Completed' ? 'mint' : 'blue',
+            unread: true,
+          })
+          existingKeys.add(key)
+        }
+      })
+
+      // 2. Upcoming vaccine due dates for this guardian's children
+      vaccinations.forEach((v) => {
+        if (v.next_due_date && v.next_due_date !== '—') {
+          const key = `user-vax-due-${v.id || v.vaccination_id}-${v.next_due_date}`
+          if (!existingKeys.has(key)) {
+            const childName = v.patient_name || 'Child'
+            newItems.push({
+              id: Date.now() + Math.floor(Math.random() * 1000),
+              key,
+              type: 'Vaccines',
+              title: 'Vaccination Due Soon',
+              child: childName,
+              description: `${childName} is scheduled for their next dose of ${v.vaccine_name || 'Vaccine'} on ${v.next_due_date}.`,
+              time: 'Follow-up due',
+              tone: 'mint',
+              unread: true,
+            })
+            existingKeys.add(key)
+          }
+        }
+      })
+
+      if (newItems.length === 0) return prev
+      return [...newItems, ...prev]
+    })
+  }, [])
+
+  // Sync real-time updates for clinic admin operations
+  const syncAdminUpdates = useCallback(({ appointments = [], vaccinations = [] }) => {
+    setNotifications((prev) => {
+      const existingKeys = new Set(prev.map((n) => n.key).filter(Boolean))
+      const newItems = []
+
+      // Pending appointments needing admin attention
+      appointments.filter(a => a.status === 'Pending').forEach((a) => {
+        const key = `admin-pending-${a.id}`
+        if (!existingKeys.has(key)) {
+          newItems.push({
+            id: Date.now() + Math.floor(Math.random() * 1000),
+            key,
+            type: 'Visits',
+            title: 'New Appointment Booking',
+            child: a.patient_name || `Patient #${a.patient_id}`,
+            description: `New visit booked for ${a.appointment_date} at ${a.appointment_time}. Awaiting clinic confirmation.`,
+            time: 'Pending review',
+            tone: 'blue',
+            unread: true,
+          })
+          existingKeys.add(key)
+        }
+      })
+
+      if (newItems.length === 0) return prev
+      return [...newItems, ...prev]
+    })
+  }, [])
 
   const markAsRead = (id) => {
     setNotifications((current) => current.map((n) => (n.id === id ? { ...n, unread: false } : n)))
@@ -183,6 +222,8 @@ export function NotificationProvider({ children }) {
       setIsOpen,
       unreadCount,
       addNotification,
+      syncUserUpdates,
+      syncAdminUpdates,
       markAsRead,
       markAllAsRead,
       removeNotification,

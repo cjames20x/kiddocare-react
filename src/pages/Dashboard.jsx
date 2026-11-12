@@ -390,6 +390,7 @@ export default function Dashboard() {
         listMyPatients(accessToken),
         listVaccinations(accessToken).catch(() => []),
       ])
+      setRawVaccinations(vaxList || [])
       setChildren((patients || []).map((p) => toChildShape(p, vaxList)))
     } catch (err) {
       setPatientsError(err.message || 'Could not load patients.')
@@ -404,10 +405,11 @@ export default function Dashboard() {
   }, [accessToken])
 
   // Appointments state connected LIVE to Supabase backend
-  const { addNotification } = useNotifications()
+  const { addNotification, syncUserUpdates } = useNotifications()
   const [appointments, setAppointments] = useState([])
   const [appointmentsLoading, setAppointmentsLoading] = useState(false)
   const [doctors, setDoctors] = useState([])
+  const [rawVaccinations, setRawVaccinations] = useState([])
   const [bookedSlots, setBookedSlots] = useState([])
   const [checkingSlots, setCheckingSlots] = useState(false)
 
@@ -473,6 +475,13 @@ export default function Dashboard() {
     }, 5000)
     return () => clearInterval(interval)
   }, [accessToken])
+
+  // Sync isolated, non-centralized updates for this guardian's account
+  useEffect(() => {
+    if (children.length > 0 || appointments.length > 0 || rawVaccinations.length > 0) {
+      syncUserUpdates({ children, appointments, vaccinations: rawVaccinations })
+    }
+  }, [children, appointments, rawVaccinations, syncUserUpdates])
 
   // The shared sidebar switches tabs by navigating to /dashboard with state,
   // so keep activeTab in sync whenever that navigation happens.
@@ -579,6 +588,14 @@ export default function Dashboard() {
         accessToken
       )
       await loadPatients()
+      const registeredName = registerForm.name.trim()
+      addNotification({
+        type: 'Visits',
+        title: 'Child Registered',
+        child: registeredName,
+        description: `${registeredName} was successfully registered under your profile.`,
+        tone: 'blue',
+      })
       setRegisterForm({
         name: '',
         dob: '',

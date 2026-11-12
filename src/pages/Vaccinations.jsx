@@ -69,10 +69,6 @@ export default function Vaccinations() {
     return matchesSearch && matchesChild
   })
 
-  // Pending count = vaccinations with scheduled next due date
-  const pendingCount = records.filter((r) => r.status === 'Pending' || Boolean(r.next_due_date)).length
-  const completedCount = records.filter((r) => r.status === 'Completed' || (!r.next_due_date && r.status !== 'Pending')).length
-
   return (
     <div className="dash-layout">
       <DashboardSidebar active="Vaccinations" />
@@ -86,45 +82,6 @@ export default function Vaccinations() {
               Live Supabase Records
             </span>
             <NotificationButton />
-          </div>
-        </div>
-
-        {/* Quick Summary Cards */}
-        <div className="kcc-cards" style={{ marginBottom: '20px' }}>
-          <div className="kcc-card">
-            <div className="kcc-text">
-              <div className="kcc-num">{records.length}</div>
-              <div className="kcc-label">Doses Administered</div>
-            </div>
-            <svg className="kcc-icon" width="100" height="130" viewBox="0 0 100 130" aria-hidden="true">
-              <g transform="rotate(35 50 85)">
-                <rect x="38" y="40" width="24" height="70" rx="5" fill="#4588cd" />
-                <rect x="30" y="34" width="40" height="8" rx="3" fill="#3465ae" />
-                <rect x="47" y="14" width="6" height="22" fill="#3465ae" />
-                <rect x="46" y="110" width="8" height="20" fill="#3465ae" />
-              </g>
-            </svg>
-          </div>
-          <div className="kcc-card">
-            <div className="kcc-text">
-              <div className="kcc-num" style={{ color: '#b45309' }}>{pendingCount}</div>
-              <div className="kcc-label">Pending Follow-up Doses</div>
-            </div>
-            <svg className="kcc-icon" width="100" height="130" viewBox="0 0 100 130" aria-hidden="true">
-              <path d="M12 32 H89 A10 10 0 0 1 99 42 V130 H2 V42 A10 10 0 0 1 12 32 Z" fill="#f59e0b" />
-              <rect x="10" y="40" width="80" height="18" rx="3" fill="#d97706" />
-              <rect x="45" y="71" width="27" height="27" rx="7" fill="#d97706" />
-            </svg>
-          </div>
-          <div className="kcc-card">
-            <div className="kcc-text">
-              <div className="kcc-num" style={{ color: '#059669' }}>{completedCount}</div>
-              <div className="kcc-label">Completed Series</div>
-            </div>
-            <svg className="kcc-icon" width="100" height="130" viewBox="0 0 100 130" aria-hidden="true">
-              <rect x="24" y="27" width="54" height="57" rx="26" fill="#10b981" />
-              <path d="M0 130 C0 110 22 99 50 99 C78 99 100 110 100 130 Z" fill="#10b981" />
-            </svg>
           </div>
         </div>
 

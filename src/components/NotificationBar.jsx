@@ -8,7 +8,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { useNotifications } from '../context/NotificationContext.jsx'
+import { useNotifications, getNotificationIcon } from '../context/NotificationContext.jsx'
 import './NotificationBar.css'
 
 const PRIMARY_TABS = ['Unread', 'All']
@@ -138,7 +138,7 @@ export default function NotificationBar() {
 
           <div className="notification-list">
             {visibleNotifications.length > 0 ? visibleNotifications.map((notification) => {
-              const Icon = notification.icon || Bell
+              const Icon = notification.icon || getNotificationIcon(notification.type)
               const tone = notification.tone || 'blue'
 
               return (
