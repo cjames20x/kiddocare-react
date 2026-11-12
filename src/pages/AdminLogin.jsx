@@ -18,6 +18,7 @@ export default function AdminLogin() {
   const [mfaPendingToken, setMfaPendingToken] = useState(null)
   const [mfaCode, setMfaCode] = useState('')
   const [emailHint, setEmailHint] = useState('')
+  const [devCode, setDevCode] = useState('')
 
   function enforceStaffRole(user) {
     if (!STAFF_ROLES.includes(user.role)) {
@@ -100,7 +101,27 @@ export default function AdminLogin() {
           ) : (
             <>
               <h2>Two-step verification</h2>
-              <p className="auth-sub spaced">Enter the 6-digit verification code sent to {emailHint || 'your administrator email'}</p>
+              <p className="auth-sub spaced">Enter the 6-digit verification code sent to <strong>{emailHint || 'your administrator email'}</strong></p>
+              {devCode && (
+                <div style={{
+                  background: '#ecfdf5',
+                  border: '1.5px solid #a7f3d0',
+                  borderRadius: '8px',
+                  padding: '10px 14px',
+                  marginBottom: '16px',
+                  fontSize: '13px',
+                  color: '#065f46',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ fontWeight: 600 }}>Your Admin MFA Code:</div>
+                  <div style={{ fontSize: '24px', fontWeight: 800, letterSpacing: '4px', margin: '4px 0', color: '#047857' }}>
+                    {devCode}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#059669' }}>
+                    (Code auto-filled. Click &quot;Verify code&quot; below)
+                  </div>
+                </div>
+              )}
               {error && <p className="auth-error">{error}</p>}
               <form onSubmit={handleMfaSubmit}>
                 <div className="form-group">
