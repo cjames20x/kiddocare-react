@@ -35,7 +35,14 @@ export default function Home() {
               <h1>KIDDOCARE</h1>
               <p className="hero-sub">Advanced Pediatric Management System for Modern Clinics</p>
               <p className="hero-tag">Streamline operations &bull; Improve patient care &bull; Boost vaccination coverage</p>
-              <button className="btn-cta">Get Started</button>
+              <button
+                className="btn-cta"
+                onClick={() => {
+                  document.getElementById('services')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+              >
+                Get Started
+              </button>
             </>
           )}
         </div>

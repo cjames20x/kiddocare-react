@@ -700,17 +700,21 @@ function SectionMedicalRecords() {
       if (Array.isArray(pats)) setPatients(pats);
       if (Array.isArray(docs)) setDoctors(docs);
       if (Array.isArray(records) && records.length > 0) {
-        setRows(records.map((r, i) => ({
-          id: `MR-${String(r.id || i + 1).padStart(3, '0')}`,
-          rawId: r.id,
-          patient: r.patient_name || `Patient #${r.patient_id}`,
-          patient_id: r.patient_id,
-          date: r.created_at ? String(r.created_at).slice(0, 10) : '2026-11-12',
-          diagnosis: r.diagnosis || 'General Consultation',
-          symptoms: r.symptoms || '',
-          doctor: r.doctor_name || 'Attending Doctor',
-          doctor_id: r.doctor_id,
-        })));
+        setRows(records.map((r, i) => {
+          const docObj = (docs || []).find(d => String(d.id) === String(r.doctor_id));
+          const docName = r.doctor_name || (docObj ? (docObj.doctor_name || docObj.name) : null) || 'Dr. Christian Mauricio';
+          return {
+            id: `MR-${String(r.id || i + 1).padStart(3, '0')}`,
+            rawId: r.id,
+            patient: r.patient_name || `Patient #${r.patient_id}`,
+            patient_id: r.patient_id,
+            date: r.created_at ? String(r.created_at).slice(0, 10) : '2026-11-12',
+            diagnosis: r.diagnosis || 'General Consultation',
+            symptoms: r.symptoms || '',
+            doctor: docName,
+            doctor_id: r.doctor_id,
+          };
+        }));
       }
     } catch (e) {
       console.warn('Could not load medical records:', e);
@@ -802,7 +806,7 @@ function SectionMedicalRecords() {
               <option value="">-- Select attending doctor --</option>
               {doctors.map(d => (
                 <option key={d.id} value={d.id}>
-                  {d.name || (d.profiles && d.profiles.full_name) || `Dr. #${d.id}`}
+                  {d.doctor_name || d.name || `Dr. #${d.id}`}
                 </option>
               ))}
             </select>
@@ -1890,20 +1894,24 @@ function SectionVaccinations() {
       if (Array.isArray(vList)) setVaccines(vList);
       if (Array.isArray(docs)) setDoctors(docs);
       if (Array.isArray(vaxList) && vaxList.length > 0) {
-        setRows(vaxList.map((v, i) => ({
-          id: `V-${String(v.id || i + 1).padStart(3, '0')}`,
-          rawId: v.id,
-          patient: v.patient_name || `Patient #${v.patient_id}`,
-          patient_id: v.patient_id,
-          vaccine: v.vaccine_name || 'Pediatric Vaccine',
-          vaccine_id: v.vaccine_id,
-          dose_number: v.dose_number || 1,
-          doctor: v.doctor_name || 'Attending Doctor',
-          doctor_id: v.doctor_id,
-          date: v.date_administered || '—',
-          next_due_date: v.next_due_date || '—',
-          status: v.date_administered ? 'Completed' : 'Pending',
-        })));
+        setRows(vaxList.map((v, i) => {
+          const docObj = (docs || []).find(d => String(d.id) === String(v.doctor_id));
+          const docName = v.doctor_name || (docObj ? (docObj.doctor_name || docObj.name) : null) || 'Dr. Christian Mauricio';
+          return {
+            id: `V-${String(v.id || i + 1).padStart(3, '0')}`,
+            rawId: v.id,
+            patient: v.patient_name || `Patient #${v.patient_id}`,
+            patient_id: v.patient_id,
+            vaccine: v.vaccine_name || 'Pediatric Vaccine',
+            vaccine_id: v.vaccine_id,
+            dose_number: v.dose_number || 1,
+            doctor: docName,
+            doctor_id: v.doctor_id,
+            date: v.date_administered || '—',
+            next_due_date: v.next_due_date || '—',
+            status: v.date_administered ? 'Completed' : 'Pending',
+          };
+        }));
       }
     } catch (e) {
       console.warn('Could not load vaccinations:', e);
@@ -2037,7 +2045,7 @@ function SectionVaccinations() {
               <option value="">-- Select attending doctor --</option>
               {doctors.map(d => (
                 <option key={d.id} value={d.id}>
-                  {d.name || (d.profiles && d.profiles.full_name) || `Dr. #${d.id}`}
+                  {d.doctor_name || d.name || `Dr. #${d.id}`}
                 </option>
               ))}
             </select>
@@ -2188,19 +2196,23 @@ function SectionPrescriptions() {
       if (Array.isArray(pats)) setPatients(pats);
       if (Array.isArray(docs)) setDoctors(docs);
       if (Array.isArray(rxList) && rxList.length > 0) {
-        setRows(rxList.map((r, i) => ({
-          id: `RX-${String(r.id || i + 1).padStart(3, '0')}`,
-          rawId: r.id,
-          patient: r.patient_name || `Patient #${r.patient_id}`,
-          patient_id: r.patient_id,
-          medication: r.medication_name,
-          dosage: r.dosage,
-          frequency: r.medication_frequency,
-          duration: r.medication_duration,
-          doctor: r.doctor_name || 'Attending Doctor',
-          doctor_id: r.doctor_id,
-          date: '2026-11-12',
-        })));
+        setRows(rxList.map((r, i) => {
+          const docObj = (docs || []).find(d => String(d.id) === String(r.doctor_id));
+          const docName = r.doctor_name || (docObj ? (docObj.doctor_name || docObj.name) : null) || 'Dr. Christian Mauricio';
+          return {
+            id: `RX-${String(r.id || i + 1).padStart(3, '0')}`,
+            rawId: r.id,
+            patient: r.patient_name || `Patient #${r.patient_id}`,
+            patient_id: r.patient_id,
+            medication: r.medication_name,
+            dosage: r.dosage,
+            frequency: r.medication_frequency,
+            duration: r.medication_duration,
+            doctor: docName,
+            doctor_id: r.doctor_id,
+            date: '2026-11-12',
+          };
+        }));
       }
     } catch (e) {
       console.warn('Could not load prescriptions:', e);
@@ -2292,7 +2304,7 @@ function SectionPrescriptions() {
               <option value="">-- Select prescribing doctor --</option>
               {doctors.map(d => (
                 <option key={d.id} value={d.id}>
-                  {d.name || (d.profiles && d.profiles.full_name) || `Dr. #${d.id}`}
+                  {d.doctor_name || d.name || `Dr. #${d.id}`}
                 </option>
               ))}
             </select>

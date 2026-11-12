@@ -61,6 +61,7 @@ export function AuthProvider({ children }) {
     setAccessToken(access_token)
     setRefreshToken(refresh_token)
     setUser(shapeProfile(backendUser, signupExtras))
+    setLoading(false)
   }
 
   function clearSession() {
@@ -69,6 +70,7 @@ export function AuthProvider({ children }) {
     setAccessToken(null)
     setRefreshToken(null)
     setUser(null)
+    setLoading(false)
   }
 
   // Returns { mfaRequired: true, mfaPendingToken } if the account has MFA
