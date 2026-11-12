@@ -462,6 +462,7 @@ export default function Dashboard() {
     guardian: user?.guardianName || '',
     contact: user?.contactNumber || '',
     relationship: 'Mother',
+    address: '',
     weight: '',
     height: '',
   })
@@ -544,6 +545,7 @@ export default function Dashboard() {
           patient_name: registerForm.name.trim(),
           date_of_birth: registerForm.dob,
           gender: registerForm.gender.toLowerCase(),
+          address: registerForm.address ? registerForm.address.trim() : null,
           relationship_to_patient: registerForm.relationship || null,
           weight: Number(registerForm.weight),
           height: Number(registerForm.height),
@@ -558,6 +560,7 @@ export default function Dashboard() {
         guardian: user?.guardianName || '',
         contact: user?.contactNumber || '',
         relationship: 'Mother',
+        address: '',
         weight: '',
         height: '',
       })
@@ -1085,6 +1088,16 @@ export default function Dashboard() {
                     onChange={(e) => setRegisterForm({ ...registerForm, relationship: e.target.value })}
                   />
                 </div>
+              </div>
+
+              <div className="form-group">
+                <label>Home Address:</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 123 Sampaguita St., Quezon City"
+                  value={registerForm.address}
+                  onChange={(e) => setRegisterForm({ ...registerForm, address: e.target.value })}
+                />
               </div>
 
               <button type="submit" className="btn-book" style={{ marginTop: '12px' }} disabled={registerSubmitting}>

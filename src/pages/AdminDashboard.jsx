@@ -519,8 +519,8 @@ function SectionPatientMgmt() {
   const [viewP, setViewP] = useState(null);
   const [editP, setEditP] = useState(null);
   const [deleteP, setDeleteP] = useState(null);
-  const [addF, setAddF] = useState({ name: '', age: '2020-01-01', gender: 'Male', nextVisit: '', guardian: '' });
-  const [editF, setEditF] = useState({ name: '', age: '', gender: 'Male', nextVisit: '', guardian: '' });
+  const [addF, setAddF] = useState({ name: '', age: '2020-01-01', gender: 'Male', address: '', nextVisit: '', guardian: '' });
+  const [editF, setEditF] = useState({ name: '', age: '', gender: 'Male', address: '', nextVisit: '', guardian: '' });
 
   async function loadLivePatients() {
     try {
@@ -540,6 +540,7 @@ function SectionPatientMgmt() {
               name: p.patient_name,
               age: p.date_of_birth || 'N/A',
               gender: p.gender ? p.gender.charAt(0).toUpperCase() + p.gender.slice(1) : 'Male',
+              address: p.address || '—',
               nextVisit: upcoming ? upcoming.appointment_date : (p.registration_date ? String(p.registration_date).slice(0, 10) : '—'),
               guardian: p.guardian_name || p.guardian || 'Guardian',
             };
@@ -572,11 +573,12 @@ function SectionPatientMgmt() {
           patient_name: addF.name.trim(),
           date_of_birth: addF.age,
           gender: addF.gender.toLowerCase(),
+          address: addF.address ? addF.address.trim() : null,
         },
         token
       );
       await loadLivePatients();
-      setAddF({ name: '', age: '2020-01-01', gender: 'Male', nextVisit: '', guardian: '' });
+      setAddF({ name: '', age: '2020-01-01', gender: 'Male', address: '', nextVisit: '', guardian: '' });
       setShowAdd(false);
     } catch (err) {
       alert(err.message || 'Could not register patient');
@@ -593,6 +595,7 @@ function SectionPatientMgmt() {
           patient_name: editF.name.trim(),
           date_of_birth: editF.age,
           gender: editF.gender.toLowerCase(),
+          address: editF.address ? editF.address.trim() : null,
         },
         token
       );
@@ -614,31 +617,33 @@ function SectionPatientMgmt() {
         <PanelHead icon={Users} title="All Patients" search={search} setSearch={setSearch} onAdd={()=>setShowAdd(true)}/>
         <div className="adm-table-wrap">
           <table className="adm-table">
-            <thead><tr><th>PatientId</th><th>Name</th><th>Age</th><th>Gender</th><th>Next Visit</th><th>Parent/Guardian</th><th>Actions</th></tr></thead>
+            <thead><tr><th>PatientId</th><th>Name</th><th>Age</th><th>Gender</th><th>Address</th><th>Next Visit</th><th>Parent/Guardian</th><th>Actions</th></tr></thead>
             <tbody>
               {filtered.map(p=>(
                 <tr key={p.id}>
                   <td>{p.id}</td><td>{p.name}</td><td>{p.age}</td><td>{p.gender}</td>
+                  <td>{p.address}</td>
                   <td>{fmt(p.nextVisit)}</td><td>{p.guardian}</td>
                   <td><div className="adm-actions">
                     <button className="adm-btn-view" onClick={()=>setViewP(p)}><Eye size={17}/></button>
-                    <button className="adm-btn-edit" onClick={()=>{ setEditP(p); setEditF({name:p.name,age:p.age,gender:p.gender,nextVisit:p.nextVisit,guardian:p.guardian}) }}><Pencil size={16}/></button>
+                    <button className="adm-btn-edit" onClick={()=>{ setEditP(p); setEditF({name:p.name,age:p.age,gender:p.gender,address:p.address!=='—'?p.address:'',nextVisit:p.nextVisit,guardian:p.guardian}) }}><Pencil size={16}/></button>
                     <button className="adm-btn-delete" onClick={()=>setDeleteP(p)}><Trash2 size={16}/></button>
                   </div></td>
                 </tr>
               ))}
+              {!filtered.length && <tr><td colSpan={8} style={{textAlign:'center',color:'#9ca3af',padding:24}}>No patients found.</td></tr>}
             </tbody>
           </table>
         </div>
       </div>
       {showAdd && <Overlay onClose={()=>setShowAdd(false)}><ModalHdr title="Add Patient" onClose={()=>setShowAdd(false)}/>
         <div className="adm-modal-body"><form onSubmit={doAdd}>
-          <Field label="Patient Name:"><Inp value={addF.name} placeholder="Name" onChange={e=>setAddF({...addF,name:e.target.value})}/></Field>
-          <Field label="Patient Age:"><Inp value={addF.age} placeholder="e.g. 2 years" onChange={e=>setAddF({...addF,age:e.target.value})}/></Field>
+          <Field label="Patient Name: *"><Inp value={addF.name} placeholder="Name" onChange={e=>setAddF({...addF,name:e.target.value})}/></Field>
+          <Field label="Patient Date of Birth: *"><Inp type="date" value={addF.age} onChange={e=>setAddF({...addF,age:e.target.value})}/></Field>
           <Field label="Gender"><GenderToggle value={addF.gender} onChange={g=>setAddF({...addF,gender:g})}/></Field>
-          <Field label="Next Visit:"><Inp type="date" value={addF.nextVisit} onChange={e=>setAddF({...addF,nextVisit:e.target.value})}/></Field>
-          <Field label="Parent/Guardian:"><Inp value={addF.guardian} placeholder="Guardian name" onChange={e=>setAddF({...addF,guardian:e.target.value})}/></Field>
-          <SubmitBtn label="Add"/>
+          <Field label="Home Address:"><Inp value={addF.address} placeholder="e.g. 123 Sampaguita St., Quezon City" onChange={e=>setAddF({...addF,address:e.target.value})}/></Field>
+          <Field label="Parent/Guardian:"><Inp value={addF.guardian} placeholder="Guardian name (optional, defaults to registered guardian)" onChange={e=>setAddF({...addF,guardian:e.target.value})}/></Field>
+          <SubmitBtn label="Add Patient"/>
         </form></div>
       </Overlay>}
       {viewP && <Overlay onClose={()=>setViewP(null)}><ModalHdr title="View Patient" onClose={()=>setViewP(null)}/>
@@ -646,11 +651,12 @@ function SectionPatientMgmt() {
           <Field label="Patient ID:"><RO val={viewP.id}/></Field>
           <Field label="Name:"><RO val={viewP.name}/></Field>
           <div className="adm-field-row">
-            <Field label="Age:"><RO val={viewP.age}/></Field>
+            <Field label="Date of Birth:"><RO val={viewP.age}/></Field>
             <Field label="Gender"><GenderToggle value={viewP.gender} onChange={()=>{}}/></Field>
           </div>
-          <Field label="Next Visit:"><RO val={viewP.nextVisit}/></Field>
-          <Field label="Guardian:"><RO val={viewP.guardian}/></Field>
+          <Field label="Home Address:"><RO val={viewP.address || '—'}/></Field>
+          <Field label="Next Visit:"><RO val={fmt(viewP.nextVisit)}/></Field>
+          <Field label="Parent/Guardian:"><RO val={viewP.guardian}/></Field>
         </div>
       </Overlay>}
       {editP && <Overlay onClose={()=>setEditP(null)}><ModalHdr title="Edit Patient" onClose={()=>setEditP(null)}/>
@@ -658,12 +664,11 @@ function SectionPatientMgmt() {
           <Field label="Patient ID:"><RO val={editP.id}/></Field>
           <Field label="Patient Name:"><Inp value={editF.name} onChange={e=>setEditF({...editF,name:e.target.value})}/></Field>
           <div className="adm-field-row">
-            <Field label="Age:"><Inp value={editF.age} onChange={e=>setEditF({...editF,age:e.target.value})}/></Field>
+            <Field label="Date of Birth:"><Inp type="date" value={editF.age} onChange={e=>setEditF({...editF,age:e.target.value})}/></Field>
             <Field label="Gender"><GenderToggle value={editF.gender} onChange={g=>setEditF({...editF,gender:g})}/></Field>
           </div>
-          <Field label="Next Visit:"><Inp type="date" value={editF.nextVisit} onChange={e=>setEditF({...editF,nextVisit:e.target.value})}/></Field>
-          <Field label="Guardian:"><Inp value={editF.guardian} onChange={e=>setEditF({...editF,guardian:e.target.value})}/></Field>
-          <SubmitBtn label="Edit"/>
+          <Field label="Home Address:"><Inp value={editF.address} placeholder="Home address" onChange={e=>setEditF({...editF,address:e.target.value})}/></Field>
+          <SubmitBtn label="Save Changes"/>
         </form></div>
       </Overlay>}
       {deleteP && <Overlay onClose={()=>setDeleteP(null)}><ModalHdr title="Delete Patient" onClose={()=>setDeleteP(null)}/>
@@ -678,19 +683,22 @@ function SectionMedicalRecords() {
   const token = accessToken || localStorage.getItem('kiddocare-token') || DEMO_ADMIN_TOKEN;
   const [rows, setRows]     = useState(INIT_RECORDS)
   const [patients, setPatients] = useState([])
+  const [doctors, setDoctors] = useState([])
   const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const [viewR,   setViewR]   = useState(null)
   const [deleteR, setDeleteR] = useState(null)
-  const [addF, setAddF]= useState({ patient_id:'', symptoms:'', diagnosis:'', doctor:'Dra. Maury V. Reyes' })
+  const [addF, setAddF]= useState({ patient_id:'', doctor_id:'', symptoms:'', diagnosis:'' })
 
   async function loadRecords() {
     try {
-      const [records, pats] = await Promise.all([
+      const [records, pats, docs] = await Promise.all([
         listMedicalRecords(token).catch(() => []),
         listMyPatients(token).catch(() => []),
+        listDoctors(token).catch(() => []),
       ]);
       if (Array.isArray(pats)) setPatients(pats);
+      if (Array.isArray(docs)) setDoctors(docs);
       if (Array.isArray(records) && records.length > 0) {
         setRows(records.map((r, i) => ({
           id: `MR-${String(r.id || i + 1).padStart(3, '0')}`,
@@ -700,7 +708,8 @@ function SectionMedicalRecords() {
           date: r.created_at ? String(r.created_at).slice(0, 10) : '2026-11-12',
           diagnosis: r.diagnosis || 'General Consultation',
           symptoms: r.symptoms || '',
-          doctor: 'Pediatric Specialist',
+          doctor: r.doctor_name || 'Attending Doctor',
+          doctor_id: r.doctor_id,
         })));
       }
     } catch (e) {
@@ -714,23 +723,25 @@ function SectionMedicalRecords() {
 
   const filtered = rows.filter(r=>
     (r.patient || '').toLowerCase().includes(search.toLowerCase())||
-    (r.diagnosis || '').toLowerCase().includes(search.toLowerCase())
+    (r.diagnosis || '').toLowerCase().includes(search.toLowerCase())||
+    (r.doctor || '').toLowerCase().includes(search.toLowerCase())
   );
 
   async function doAdd(e) {
     e.preventDefault();
-    if (!addF.patient_id || !addF.diagnosis) {
-      alert('Please select a patient and enter a diagnosis.');
+    if (!addF.patient_id || !addF.diagnosis || !addF.doctor_id) {
+      alert('Please select a patient, attending doctor, and enter a diagnosis.');
       return;
     }
     try {
       await createMedicalRecord({
         patient_id: Number(addF.patient_id),
+        doctor_id: Number(addF.doctor_id),
         diagnosis: addF.diagnosis.trim(),
         symptoms: addF.symptoms ? addF.symptoms.trim() : 'Routine pediatric checkup',
       }, token);
       await loadRecords();
-      setAddF({ patient_id:'', symptoms:'', diagnosis:'', doctor:'Dra. Maury V. Reyes' });
+      setAddF({ patient_id:'', doctor_id:'', symptoms:'', diagnosis:'' });
       setShowAdd(false);
     } catch (err) {
       alert(err.message || 'Could not save medical record');
@@ -748,7 +759,7 @@ function SectionMedicalRecords() {
         <PanelHead icon={ClipboardList} title="Medical Records" search={search} setSearch={setSearch} onAdd={()=>setShowAdd(true)}/>
         <div className="adm-table-wrap">
           <table className="adm-table">
-            <thead><tr><th>Record ID</th><th>Patient</th><th>Date</th><th>Diagnosis</th><th>Doctor</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Record ID</th><th>Patient</th><th>Date</th><th>Diagnosis</th><th>Attending Doctor</th><th>Actions</th></tr></thead>
             <tbody>
               {filtered.map(r=>(
                 <tr key={r.id}>
@@ -781,20 +792,38 @@ function SectionMedicalRecords() {
               ))}
             </select>
           </Field>
-          <Field label="Diagnosis: *"><Inp value={addF.diagnosis} placeholder="e.g. Acute Pharyngitis" onChange={e=>setAddF({...addF,diagnosis:e.target.value})}/></Field>
-          <Field label="Symptoms:"><Inp value={addF.symptoms} placeholder="e.g. Mild fever, dry cough" onChange={e=>setAddF({...addF,symptoms:e.target.value})}/></Field>
-          <Field label="Doctor:"><Inp value={addF.doctor} placeholder="Attending doctor" onChange={e=>setAddF({...addF,doctor:e.target.value})}/></Field>
-          <SubmitBtn label="Add Record"/>
+          <Field label="Attending Doctor: *">
+            <select
+              className="adm-inp"
+              value={addF.doctor_id}
+              onChange={e=>setAddF({...addF, doctor_id: e.target.value})}
+              required
+            >
+              <option value="">-- Select attending doctor --</option>
+              {doctors.map(d => (
+                <option key={d.id} value={d.id}>
+                  {d.name || (d.profiles && d.profiles.full_name) || `Dr. #${d.id}`}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Diagnosis: *">
+            <Inp value={addF.diagnosis} placeholder="e.g. Acute Pharyngitis, Viral Syndrome" onChange={e=>setAddF({...addF,diagnosis:e.target.value})}/>
+          </Field>
+          <Field label="Symptoms:">
+            <Inp value={addF.symptoms} placeholder="e.g. Mild fever, dry cough, rhinorrhea" onChange={e=>setAddF({...addF,symptoms:e.target.value})}/>
+          </Field>
+          <SubmitBtn label="Add Medical Record"/>
         </form></div>
       </Overlay>}
       {viewR && <Overlay onClose={()=>setViewR(null)}><ModalHdr title="Medical Record" onClose={()=>setViewR(null)}/>
         <div className="adm-modal-body">
           <Field label="Record ID:"><RO val={viewR.id}/></Field>
           <Field label="Patient:"><RO val={viewR.patient}/></Field>
+          <Field label="Attending Doctor:"><RO val={viewR.doctor}/></Field>
           <Field label="Date:"><RO val={fmt(viewR.date)}/></Field>
           <Field label="Diagnosis:"><RO val={viewR.diagnosis}/></Field>
           <Field label="Symptoms:"><RO val={viewR.symptoms || 'None recorded'}/></Field>
-          <Field label="Doctor:"><RO val={viewR.doctor}/></Field>
         </div>
       </Overlay>}
       {deleteR && <Overlay onClose={()=>setDeleteR(null)}><ModalHdr title="Delete Record" onClose={()=>setDeleteR(null)}/>
@@ -1834,25 +1863,45 @@ function SectionVaccinations() {
   const token = accessToken || localStorage.getItem('kiddocare-token') || DEMO_ADMIN_TOKEN;
   const [rows, setRows]     = useState(INIT_VACC);
   const [patients, setPatients] = useState([]);
-  const [search, setSearch] = useState('');
-  const [showAdd, setShowAdd] = useState(false);
-  const [deleteV, setDeleteV] = useState(null);
-  const [addF, setAddF] = useState({ patient_id:'', vaccine_name:'', date:'', status:'Completed' });
+  const [vaccines, setVaccines] = useState([]);
+  const [doctors, setDoctors]   = useState([]);
+  const [search, setSearch]     = useState('');
+  const [showAdd, setShowAdd]   = useState(false);
+  const [viewV, setViewV]       = useState(null);
+  const [deleteV, setDeleteV]   = useState(null);
+  const [addF, setAddF] = useState({
+    patient_id: '',
+    vaccine_id: '',
+    doctor_id: '',
+    dose_number: '1',
+    date: new Date().toISOString().slice(0, 10),
+    next_due_date: '',
+  });
 
   async function loadVax() {
     try {
-      const [vaxList, pats] = await Promise.all([
+      const [vaxList, pats, vList, docs] = await Promise.all([
         listVaccinations(token).catch(() => []),
         listMyPatients(token).catch(() => []),
+        listVaccines(token).catch(() => []),
+        listDoctors(token).catch(() => []),
       ]);
       if (Array.isArray(pats)) setPatients(pats);
+      if (Array.isArray(vList)) setVaccines(vList);
+      if (Array.isArray(docs)) setDoctors(docs);
       if (Array.isArray(vaxList) && vaxList.length > 0) {
         setRows(vaxList.map((v, i) => ({
           id: `V-${String(v.id || i + 1).padStart(3, '0')}`,
           rawId: v.id,
           patient: v.patient_name || `Patient #${v.patient_id}`,
+          patient_id: v.patient_id,
           vaccine: v.vaccine_name || 'Pediatric Vaccine',
-          date: v.date_administered || v.next_due_date || '—',
+          vaccine_id: v.vaccine_id,
+          dose_number: v.dose_number || 1,
+          doctor: v.doctor_name || 'Attending Doctor',
+          doctor_id: v.doctor_id,
+          date: v.date_administered || '—',
+          next_due_date: v.next_due_date || '—',
           status: v.date_administered ? 'Completed' : 'Pending',
         })));
       }
@@ -1867,23 +1916,34 @@ function SectionVaccinations() {
 
   const filtered = rows.filter(r=>
     (r.patient || '').toLowerCase().includes(search.toLowerCase())||
-    (r.vaccine || '').toLowerCase().includes(search.toLowerCase())
+    (r.vaccine || '').toLowerCase().includes(search.toLowerCase())||
+    (r.doctor || '').toLowerCase().includes(search.toLowerCase())
   );
 
   async function doAdd(e) {
     e.preventDefault();
-    if (!addF.patient_id || !addF.vaccine_name) {
-      alert('Please select a patient and vaccine name.');
+    if (!addF.patient_id || !addF.vaccine_id) {
+      alert('Please select a patient and vaccine from the dropdowns.');
       return;
     }
     try {
       await createVaccination({
         patient_id: Number(addF.patient_id),
-        vaccine_name: addF.vaccine_name.trim(),
+        vaccine_id: Number(addF.vaccine_id),
+        doctor_id: addF.doctor_id ? Number(addF.doctor_id) : undefined,
+        dose_number: Number(addF.dose_number || 1),
         date_administered: addF.date || new Date().toISOString().slice(0, 10),
+        next_due_date: addF.next_due_date || undefined,
       }, token);
       await loadVax();
-      setAddF({ patient_id:'', vaccine_name:'', date:'', status:'Completed' });
+      setAddF({
+        patient_id: '',
+        vaccine_id: '',
+        doctor_id: '',
+        dose_number: '1',
+        date: new Date().toISOString().slice(0, 10),
+        next_due_date: '',
+      });
       setShowAdd(false);
     } catch (err) {
       alert(err.message || 'Could not record vaccination');
@@ -1899,19 +1959,38 @@ function SectionVaccinations() {
         <PanelHead icon={Syringe} title="Vaccinations" search={search} setSearch={setSearch} onAdd={()=>setShowAdd(true)}/>
         <div className="adm-table-wrap">
           <table className="adm-table">
-            <thead><tr><th>ID</th><th>Patient</th><th>Vaccine</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Patient</th>
+                <th>Vaccine</th>
+                <th>Dose</th>
+                <th>Date Administered</th>
+                <th>Next Due Date</th>
+                <th>Doctor Who Injected</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
             <tbody>
               {filtered.map(v=>(
                 <tr key={v.id}>
-                  <td>{v.id}</td><td>{v.patient}</td><td>{v.vaccine}</td><td>{fmt(v.date)}</td>
+                  <td>{v.id}</td>
+                  <td>{v.patient}</td>
+                  <td>{v.vaccine}</td>
+                  <td>Dose {v.dose_number}</td>
+                  <td>{fmt(v.date)}</td>
+                  <td>{fmt(v.next_due_date)}</td>
+                  <td>{v.doctor}</td>
                   <td><StatusBadge status={v.status}/></td>
                   <td><div className="adm-actions">
+                    <button className="adm-btn-view" title="View details" onClick={()=>setViewV(v)}><Eye size={17}/></button>
                     {v.status==='Pending' && <button className="adm-btn-view" title="Mark completed" onClick={()=>markDone(v.id)}><Check size={17}/></button>}
                     <button className="adm-btn-delete" onClick={()=>setDeleteV(v)}><Trash2 size={16}/></button>
                   </div></td>
                 </tr>
               ))}
-              {!filtered.length && <tr><td colSpan={6} style={{textAlign:'center',color:'#9ca3af',padding:24}}>No vaccinations found.</td></tr>}
+              {!filtered.length && <tr><td colSpan={9} style={{textAlign:'center',color:'#9ca3af',padding:24}}>No vaccinations found.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -1933,17 +2012,72 @@ function SectionVaccinations() {
               ))}
             </select>
           </Field>
-          <Field label="Vaccine Name: *">
-            <Inp
-              value={addF.vaccine_name}
-              placeholder="e.g. MMR, BCG, Polio (OPV), Hepatitis B"
-              onChange={e=>setAddF({...addF,vaccine_name:e.target.value})}
-            />
+          <Field label="Select Vaccine: *">
+            <select
+              className="adm-inp"
+              value={addF.vaccine_id}
+              onChange={e=>setAddF({...addF, vaccine_id: e.target.value})}
+              required
+            >
+              <option value="">-- Select readily available vaccine --</option>
+              {vaccines.map(v => (
+                <option key={v.id} value={v.id}>
+                  {v.vaccine_name}
+                </option>
+              ))}
+            </select>
           </Field>
-          <Field label="Date Administered:">
-            <Inp type="date" value={addF.date} onChange={e=>setAddF({...addF,date:e.target.value})}/></Field>
+          <Field label="Doctor Who Injected: *">
+            <select
+              className="adm-inp"
+              value={addF.doctor_id}
+              onChange={e=>setAddF({...addF, doctor_id: e.target.value})}
+              required
+            >
+              <option value="">-- Select attending doctor --</option>
+              {doctors.map(d => (
+                <option key={d.id} value={d.id}>
+                  {d.name || (d.profiles && d.profiles.full_name) || `Dr. #${d.id}`}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <div className="adm-field-row">
+            <Field label="No. of Doses (Dose #): *">
+              <select
+                className="adm-inp"
+                value={addF.dose_number}
+                onChange={e=>setAddF({...addF, dose_number: e.target.value})}
+                required
+              >
+                <option value="1">Dose 1 (Primary)</option>
+                <option value="2">Dose 2</option>
+                <option value="3">Dose 3</option>
+                <option value="4">Booster 1</option>
+                <option value="5">Booster 2</option>
+              </select>
+            </Field>
+            <Field label="Date Administered: *">
+              <Inp type="date" value={addF.date} onChange={e=>setAddF({...addF,date:e.target.value})} required/>
+            </Field>
+          </div>
+          <Field label="Next Due Date:">
+            <Inp type="date" value={addF.next_due_date} onChange={e=>setAddF({...addF,next_due_date:e.target.value})}/>
+          </Field>
           <SubmitBtn label="Add Vaccination"/>
         </form></div>
+      </Overlay>}
+      {viewV && <Overlay onClose={()=>setViewV(null)}><ModalHdr title="Vaccination Details" onClose={()=>setViewV(null)}/>
+        <div className="adm-modal-body">
+          <Field label="Record ID:"><RO val={viewV.id}/></Field>
+          <Field label="Patient Name:"><RO val={viewV.patient}/></Field>
+          <Field label="Vaccine:"><RO val={viewV.vaccine}/></Field>
+          <Field label="Dose Number:"><RO val={`Dose ${viewV.dose_number || 1}`}/></Field>
+          <Field label="Doctor Who Injected:"><RO val={viewV.doctor || 'Attending Doctor'}/></Field>
+          <Field label="Date Administered:"><RO val={fmt(viewV.date)}/></Field>
+          <Field label="Next Due Date:"><RO val={fmt(viewV.next_due_date)}/></Field>
+          <Field label="Status:"><StatusBadge status={viewV.status}/></Field>
+        </div>
       </Overlay>}
       {deleteV && <Overlay onClose={()=>setDeleteV(null)}><ModalHdr title="Delete Vaccination" onClose={()=>setDeleteV(null)}/>
         <DeleteConfirm onCancel={()=>setDeleteV(null)} onDelete={doDelete}/>
@@ -2037,19 +2171,22 @@ function SectionPrescriptions() {
   const token = accessToken || localStorage.getItem('kiddocare-token') || DEMO_ADMIN_TOKEN;
   const [rows, setRows]     = useState(INIT_PRESCRIPTIONS);
   const [patients, setPatients] = useState([]);
+  const [doctors, setDoctors]   = useState([]);
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [viewRx,  setViewRx]  = useState(null);
   const [deleteRx, setDeleteRx]= useState(null);
-  const [addF, setAddF] = useState({ patient_id:'', medication:'', dosage:'', frequency:'', duration:'', doctor:'Dra. Maury V. Reyes' });
+  const [addF, setAddF] = useState({ patient_id:'', doctor_id:'', medication:'', dosage:'', frequency:'', duration:'' });
 
   async function loadPrescriptions() {
     try {
-      const [rxList, pats] = await Promise.all([
+      const [rxList, pats, docs] = await Promise.all([
         listPrescriptions(token).catch(() => []),
         listMyPatients(token).catch(() => []),
+        listDoctors(token).catch(() => []),
       ]);
       if (Array.isArray(pats)) setPatients(pats);
+      if (Array.isArray(docs)) setDoctors(docs);
       if (Array.isArray(rxList) && rxList.length > 0) {
         setRows(rxList.map((r, i) => ({
           id: `RX-${String(r.id || i + 1).padStart(3, '0')}`,
@@ -2060,7 +2197,8 @@ function SectionPrescriptions() {
           dosage: r.dosage,
           frequency: r.medication_frequency,
           duration: r.medication_duration,
-          doctor: 'Dra. Maury V. Reyes',
+          doctor: r.doctor_name || 'Attending Doctor',
+          doctor_id: r.doctor_id,
           date: '2026-11-12',
         })));
       }
@@ -2075,25 +2213,27 @@ function SectionPrescriptions() {
 
   const filtered = rows.filter(r=>
     (r.patient || '').toLowerCase().includes(search.toLowerCase())||
-    (r.medication || '').toLowerCase().includes(search.toLowerCase())
+    (r.medication || '').toLowerCase().includes(search.toLowerCase())||
+    (r.doctor || '').toLowerCase().includes(search.toLowerCase())
   );
 
   async function doAdd(e) {
     e.preventDefault();
-    if (!addF.patient_id || !addF.medication || !addF.dosage) {
-      alert('Please select a patient, medication name, and dosage.');
+    if (!addF.patient_id || !addF.medication || !addF.dosage || !addF.doctor_id) {
+      alert('Please select a patient, prescribing doctor, and enter medication name and dosage.');
       return;
     }
     try {
       await createPrescription({
         patient_id: Number(addF.patient_id),
+        doctor_id: Number(addF.doctor_id),
         medication_name: addF.medication.trim(),
         dosage: addF.dosage.trim(),
         medication_frequency: addF.frequency || '3x daily',
         medication_duration: addF.duration || '7 days',
       }, token);
       await loadPrescriptions();
-      setAddF({ patient_id:'', medication:'', dosage:'', frequency:'', duration:'', doctor:'Dra. Maury V. Reyes' });
+      setAddF({ patient_id:'', doctor_id:'', medication:'', dosage:'', frequency:'', duration:'' });
       setShowAdd(false);
     } catch (err) {
       alert(err.message || 'Could not record prescription');
@@ -2108,7 +2248,7 @@ function SectionPrescriptions() {
         <PanelHead icon={FileText} title="Prescriptions" search={search} setSearch={setSearch} onAdd={()=>setShowAdd(true)}/>
         <div className="adm-table-wrap">
           <table className="adm-table">
-            <thead><tr><th>ID</th><th>Patient</th><th>Medication</th><th>Dosage</th><th>Doctor</th><th>Date</th><th>Actions</th></tr></thead>
+            <thead><tr><th>ID</th><th>Patient</th><th>Medication</th><th>Dosage</th><th>Prescribing Doctor</th><th>Date</th><th>Actions</th></tr></thead>
             <tbody>
               {filtered.map(r=>(
                 <tr key={r.id}>
@@ -2142,11 +2282,25 @@ function SectionPrescriptions() {
               ))}
             </select>
           </Field>
+          <Field label="Prescribing Doctor: *">
+            <select
+              className="adm-inp"
+              value={addF.doctor_id}
+              onChange={e=>setAddF({...addF, doctor_id: e.target.value})}
+              required
+            >
+              <option value="">-- Select prescribing doctor --</option>
+              {doctors.map(d => (
+                <option key={d.id} value={d.id}>
+                  {d.name || (d.profiles && d.profiles.full_name) || `Dr. #${d.id}`}
+                </option>
+              ))}
+            </select>
+          </Field>
           <Field label="Medication Name: *"><Inp value={addF.medication} placeholder="e.g. Amoxicillin, Paracetamol" onChange={e=>setAddF({...addF,medication:e.target.value})}/></Field>
           <Field label="Dosage: *"><Inp value={addF.dosage} placeholder="e.g. 250mg / 5ml" onChange={e=>setAddF({...addF,dosage:e.target.value})}/></Field>
           <Field label="Frequency:"><Inp value={addF.frequency} placeholder="e.g. 3x daily after meals" onChange={e=>setAddF({...addF,frequency:e.target.value})}/></Field>
           <Field label="Duration:"><Inp value={addF.duration} placeholder="e.g. 7 days" onChange={e=>setAddF({...addF,duration:e.target.value})}/></Field>
-          <Field label="Doctor:"><Inp value={addF.doctor} placeholder="Prescribing doctor" onChange={e=>setAddF({...addF,doctor:e.target.value})}/></Field>
           <SubmitBtn label="Add Prescription"/>
         </form></div>
       </Overlay>}
@@ -2154,11 +2308,11 @@ function SectionPrescriptions() {
         <div className="adm-modal-body">
           <Field label="ID:"><RO val={viewRx.id}/></Field>
           <Field label="Patient:"><RO val={viewRx.patient}/></Field>
+          <Field label="Prescribing Doctor:"><RO val={viewRx.doctor}/></Field>
           <Field label="Medication:"><RO val={viewRx.medication}/></Field>
           <Field label="Instructions:"><RO val={viewRx.dosage}/></Field>
           <Field label="Frequency:"><RO val={viewRx.frequency || 'Once daily'}/></Field>
           <Field label="Duration:"><RO val={viewRx.duration || '7 days'}/></Field>
-          <Field label="Doctor:"><RO val={viewRx.doctor}/></Field>
           <Field label="Date:"><RO val={fmt(viewRx.date)}/></Field>
         </div>
       </Overlay>}
