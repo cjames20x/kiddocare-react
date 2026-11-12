@@ -36,9 +36,14 @@ export default function DashboardSidebar({ active }) {
   return (
     <>
       <aside className="dash-sidebar">
-        <div className="dash-logo">
+        <Link
+          to="/"
+          className="dash-logo"
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          style={{ display: 'block', cursor: 'pointer' }}
+        >
           <img src="/images/kiddocare-logo.png" alt="KiddoCare" />
-        </div>
+        </Link>
         <nav className="dash-nav">
           {NAV_ITEMS.map(({ icon: Icon, label, path }) => (
             <div

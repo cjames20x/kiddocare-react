@@ -224,22 +224,31 @@
 }
 
 .dash-add-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  background: var(--pink);
-  color: var(--white);
+  gap: 8px;
+  background: #e25574; /* Rich vibrant rose pink, clearly active */
+  color: #ffffff;
   border: none;
   border-radius: 8px;
-  padding: 10px 18px;
+  padding: 11px 22px;
   font-weight: 700;
+  font-size: 14px;
   font-family: inherit;
   cursor: pointer;
   white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(226, 85, 116, 0.35);
+  transition: all 0.2s ease;
 }
 
 .dash-add-btn:hover {
-  filter: brightness(0.94);
+  background: #d44363;
+  box-shadow: 0 4px 14px rgba(226, 85, 116, 0.45);
+  transform: translateY(-1px);
+}
+
+.dash-add-btn:active {
+  transform: translateY(0);
 }
 
 .dash-add-btn--blue {

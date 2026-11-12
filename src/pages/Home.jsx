@@ -45,7 +45,12 @@ export default function Home() {
         <h2>Our Services</h2>
         <div className="service-grid">
           {SERVICES.map((s) => (
-            <div className="service-card" key={s.title}>
+            <div
+              className="service-card"
+              key={s.title}
+              style={{ cursor: s.link ? 'pointer' : 'default' }}
+              onClick={() => s.link && navigate(s.link)}
+            >
               <svg className="s-icon" viewBox="0 0 48 48">{s.icon}</svg>
               <h3>{s.title}</h3>
               <p>{s.desc}</p>
@@ -118,6 +123,7 @@ const SERVICES = [
   {
     title: 'Vaccination Tracking',
     desc: 'Complete immunization records and vaccination schedule management',
+    link: '/services#vaccinations',
     icon: (
       <>
         <path d="M30 9l9 9-15 15H15v-9L30 9z" fill="none" stroke="#fff" strokeWidth="2" strokeLinejoin="round" />

@@ -7,7 +7,9 @@ export default function Footer() {
     <footer className="footer">
       <div className="footer-top">
         <div className="footer-brand">
-          <img src="/images/kiddocare-logo.png" alt="KiddoCare" className="footer-logo-img" />
+          <Link to="/" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} style={{ display: 'inline-block' }}>
+            <img src="/images/kiddocare-logo.png" alt="KiddoCare" className="footer-logo-img" />
+          </Link>
           <p>A pediatric clinic management system that keeps appointments, records, and vaccinations in one place for every family we care for.</p>
           <div className="socials">
             <a href="#" aria-label="Facebook"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="none" stroke="#fff" strokeWidth="1.4" /><path d="M14 8h-1.5c-.6 0-1 .4-1 1v2H14l-.4 2.5h-1.6V19h-2.5v-5.5H8V11h1.5V9c0-1.7 1-3 2.8-3H14z" fill="#fff" /></svg></a>
@@ -25,9 +27,9 @@ export default function Footer() {
 
         <div className="footer-col">
           <h4>Services</h4>
-          <Link to="/services">Checkups</Link>
-          <Link to="/services">Vaccinations</Link>
-          <Link to="/services">Immunization</Link>
+          <Link to="/services#checkups">Checkups</Link>
+          <Link to="/services#vaccinations">Vaccinations</Link>
+          <Link to="/services#immunization">Immunization</Link>
         </div>
 
         <div className="footer-col">

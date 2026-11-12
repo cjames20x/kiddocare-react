@@ -1,3 +1,4 @@
+import { Eye, EyeOff } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar.jsx'
@@ -177,18 +178,36 @@ export default function Signup() {
               </div>
               <div className="form-group password-wrap">
                 <label>Password:</label>
-                <input type={showPw1 ? 'text' : 'password'} placeholder="Create a password" required
-                  pattern={PASSWORD_PATTERN}
-                  title="At least 8 characters, including a letter, a number, and a special character"
-                  value={form.password} onChange={(e) => update('password', e.target.value)} />
-                <button type="button" className="toggle-pw" onClick={() => setShowPw1(!showPw1)}>👁</button>
+                <div className="pw-input-wrap">
+                  <input type={showPw1 ? 'text' : 'password'} placeholder="Create a password" required
+                    pattern={PASSWORD_PATTERN}
+                    title="At least 8 characters, including a letter, a number, and a special character"
+                    value={form.password} onChange={(e) => update('password', e.target.value)} />
+                  <button
+                    type="button"
+                    className="toggle-pw"
+                    onClick={() => setShowPw1(!showPw1)}
+                    aria-label={showPw1 ? 'Hide password' : 'Show password'}
+                  >
+                    {showPw1 ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
               </div>
               <p className="field-hint">At least 8 characters, with a letter, a number, and a special character (e.g. !@#$%)</p>
               <div className="form-group password-wrap">
                 <label>Confirm Password:</label>
-                <input type={showPw2 ? 'text' : 'password'} placeholder="Re-enter password" required
-                  value={form.confirmPassword} onChange={(e) => update('confirmPassword', e.target.value)} />
-                <button type="button" className="toggle-pw" onClick={() => setShowPw2(!showPw2)}>👁</button>
+                <div className="pw-input-wrap">
+                  <input type={showPw2 ? 'text' : 'password'} placeholder="Re-enter password" required
+                    value={form.confirmPassword} onChange={(e) => update('confirmPassword', e.target.value)} />
+                  <button
+                    type="button"
+                    className="toggle-pw"
+                    onClick={() => setShowPw2(!showPw2)}
+                    aria-label={showPw2 ? 'Hide password' : 'Show password'}
+                  >
+                    {showPw2 ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
               </div>
               <button type="submit" className="btn-primary">Continue →</button>
               <button type="button" className="btn-secondary" onClick={() => setStep(1)}>← Back</button>

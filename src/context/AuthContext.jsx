@@ -83,10 +83,11 @@ export function AuthProvider({ children }) {
         mfaPendingToken: result.mfa_pending_token,
         emailHint: result.email_hint,
         devCode: result.dev_code,
+        role: result.role,
       }
     }
     storeSession(result)
-    return { mfaRequired: false, user: result.user }
+    return { mfaRequired: false, user: result.user, role: result.user?.role }
   }
 
   async function completeMfaLogin(mfaPendingToken, code) {

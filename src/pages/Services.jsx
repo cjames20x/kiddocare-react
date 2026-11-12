@@ -1,10 +1,26 @@
-import { Link } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import Navbar from '../components/Navbar.jsx'
 import Footer from '../components/Footer.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 
 export default function Services() {
   const { isLoggedIn } = useAuth()
+  const location = useLocation()
+
+  useEffect(() => {
+    if (location.hash) {
+      const targetId = location.hash.replace('#', '')
+      const el = document.getElementById(targetId)
+      if (el) {
+        setTimeout(() => {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }, 100)
+      }
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }, [location])
 
   return (
     <>
@@ -16,7 +32,7 @@ export default function Services() {
         <h1 className="page-hero-title">SERVICES</h1>
       </section>
 
-      <section className="service-detail pink">
+      <section className="service-detail pink" id="checkups">
         <div className="detail-text">
           <h2>CHECKUPS</h2>
           <p>
@@ -31,7 +47,7 @@ export default function Services() {
         </div>
       </section>
 
-      <section className="service-detail blue reverse">
+      <section className="service-detail blue reverse" id="vaccinations">
         <div className="detail-img">
           <img src="/images/vaccinations.jpg" alt="Nurse vaccinating a toddler" />
         </div>
@@ -46,7 +62,7 @@ export default function Services() {
         </div>
       </section>
 
-      <section className="service-detail pink">
+      <section className="service-detail pink" id="immunization">
         <div className="detail-text">
           <h2>IMMUNIZATION</h2>
           <p>
@@ -61,7 +77,7 @@ export default function Services() {
         </div>
       </section>
 
-      <section className="appointment-band">
+      <section className="appointment-band" id="book">
         <img src="/images/bg-img.jpg" alt="" className="band-img" />
         <div className="appointment-card">
           <div className="appointment-info">

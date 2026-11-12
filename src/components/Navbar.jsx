@@ -12,9 +12,16 @@ export default function Navbar() {
 
   return (
     <header className="navbar">
-      <div className="logo">
+      <Link
+        to="/"
+        className="logo"
+        onClick={() => {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        style={{ cursor: 'pointer' }}
+      >
         <img src="/images/kiddocare-logo.png" alt="KiddoCare" className="logo-img" />
-      </div>
+      </Link>
       <nav className="nav-links">
         <NavLink to="/" end className={({ isActive }) => (isActive ? 'active' : '')}>
           HOME

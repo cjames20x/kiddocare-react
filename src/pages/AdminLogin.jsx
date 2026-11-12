@@ -1,3 +1,4 @@
+import { Eye, EyeOff } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar.jsx'
@@ -86,11 +87,20 @@ export default function AdminLogin() {
                 </div>
                 <div className="form-group password-wrap">
                   <label>Password:</label>
-                  <input
-                    type={showPw ? 'text' : 'password'} placeholder="Enter your password" required
-                    value={password} onChange={(e) => setPassword(e.target.value)}
-                  />
-                  <button type="button" className="toggle-pw" onClick={() => setShowPw(!showPw)}>👁</button>
+                  <div className="pw-input-wrap">
+                    <input
+                      type={showPw ? 'text' : 'password'} placeholder="Enter your password" required
+                      value={password} onChange={(e) => setPassword(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="toggle-pw"
+                      onClick={() => setShowPw(!showPw)}
+                      aria-label={showPw ? 'Hide password' : 'Show password'}
+                    >
+                      {showPw ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                 </div>
                 <a href="#" className="forgot-link">Forgot password?</a>
                 <button type="submit" className="btn-primary" disabled={submitting}>

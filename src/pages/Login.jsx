@@ -1,3 +1,4 @@
+import { Eye, EyeOff } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar.jsx'
@@ -5,8 +6,18 @@ import Footer from '../components/Footer.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 
 export default function Login() {
-  const { login, completeMfaLogin } = useAuth()
+  const { login, completeMfaLogin, logout } = useAuth()
   const navigate = useNavigate()
+  const STAFF_ROLES = ['admin', 'clinic_manager', 'doctor', 'staff']
+
+  function enforceGuardianRole(role) {
+    if (role && STAFF_ROLES.includes(role)) {
+      logout()
+      setError('Admin and staff credentials cannot be used to sign in as a user. Please use the Admin Login.')
+      return false
+    }
+    return true
+  }
   const [showPw, setShowPw] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -25,9 +36,15 @@ export default function Login() {
     setSubmitting(true)
     try {
       const result = await login(email, password)
+      if (result.role && STAFF_ROLES.includes(result.role)) {
+        logout()
+        setError('Admin and staff credentials cannot be used to sign in as a user. Please use the Admin Login.')
+        return
+      }
       if (result.mfaRequired) {
         setMfaPendingToken(result.mfaPendingToken)
       } else {
+        if (!enforceGuardianRole(result.user?.role)) return
         navigate('/dashboard')
       }
     } catch (err) {
@@ -42,7 +59,8 @@ export default function Login() {
     setError('')
     setSubmitting(true)
     try {
-      await completeMfaLogin(mfaPendingToken, mfaCode)
+      const user = await completeMfaLogin(mfaPendingToken, mfaCode)
+      if (!enforceGuardianRole(user?.role)) return
       navigate('/dashboard')
     } catch (err) {
       setError(err.message || 'Invalid code. Please try again.')
@@ -76,11 +94,20 @@ export default function Login() {
                 </div>
                 <div className="form-group password-wrap">
                   <label>Password:</label>
-                  <input
-                    type={showPw ? 'text' : 'password'} placeholder="Enter your password" required
-                    value={password} onChange={(e) => setPassword(e.target.value)}
-                  />
-                  <button type="button" className="toggle-pw" onClick={() => setShowPw(!showPw)}>👁</button>
+                  <div className="pw-input-wrap">
+                    <input
+                      type={showPw ? 'text' : 'password'} placeholder="Enter your password" required
+                      value={password} onChange={(e) => setPassword(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="toggle-pw"
+                      onClick={() => setShowPw(!showPw)}
+                      aria-label={showPw ? 'Hide password' : 'Show password'}
+                    >
+                      {showPw ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                 </div>
                 <a href="#" className="forgot-link">Forgot password?</a>
                 <button type="submit" className="btn-primary" disabled={submitting}>

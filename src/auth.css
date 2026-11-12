@@ -53,10 +53,62 @@ body:has(.step-bar) .auth-card { max-width: 460px; }
 .form-group input:focus { outline: none; border-color: var(--blue); background: var(--white); }
 
 .password-wrap { position: relative; }
-.password-wrap input { padding-right: 40px; }
-.toggle-pw {
-  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
-  background: none; border: none; cursor: pointer; color: var(--gray-73); font-size: 16px;
+.pw-input-wrap {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+.pw-input-wrap input,
+.password-wrap input {
+  width: 100%;
+  padding-right: 42px;
+}
+.pw-input-wrap .toggle-pw {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--gray-73);
+  padding: 0;
+  margin: 0;
+  width: 24px;
+  height: 24px;
+  line-height: 1;
+  transition: color 0.15s ease;
+}
+.pw-input-wrap .toggle-pw:hover {
+  color: var(--blue);
+}
+
+/* Fallback if pw-input-wrap is not used */
+.password-wrap > .toggle-pw {
+  position: absolute;
+  right: 12px;
+  top: auto;
+  bottom: 0;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--gray-73);
+  padding: 0;
+  margin: 0;
+  width: 24px;
+  line-height: 1;
+  transition: color 0.15s ease;
+}
+.password-wrap > .toggle-pw:hover {
+  color: var(--blue);
 }
 
 .gender-group { text-align: center; margin-bottom: 18px; }
