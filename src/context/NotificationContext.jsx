@@ -1,7 +1,8 @@
-import { createContext, useContext, useState } from 'react'
-import { CalendarDays, CreditCard, Edit3, Syringe } from 'lucide-react'
+import { createContext, useContext, useState, useEffect } from 'react'
+import { CalendarDays, CreditCard, Edit3, Syringe, Bell } from 'lucide-react'
+import { useAuth } from './AuthContext.jsx'
 
-const INITIAL_NOTIFICATIONS = [
+const GUARDIAN_NOTIFICATIONS = [
   {
     id: 1,
     type: 'Visits',
@@ -40,7 +41,7 @@ const INITIAL_NOTIFICATIONS = [
     type: 'Bills',
     title: 'Payment Received Successfully',
     child: 'Liam',
-    description: "Your payment of $85.00 for Liam's clinic visit has been received and applied to your account.",
+    description: "Your payment of ₱1,200 for Liam's clinic visit has been received and applied to your account.",
     time: 'Yesterday',
     icon: CreditCard,
     tone: 'gold',
@@ -55,7 +56,7 @@ const INITIAL_NOTIFICATIONS = [
     time: 'Yesterday',
     icon: Syringe,
     tone: 'mint',
-    unread: true,
+    unread: false,
   },
   {
     id: 6,
@@ -66,16 +67,113 @@ const INITIAL_NOTIFICATIONS = [
     time: '2 days ago',
     icon: CreditCard,
     tone: 'gold',
+    unread: false,
+  },
+]
+
+const STAFF_NOTIFICATIONS = [
+  {
+    id: 101,
+    type: 'Visits',
+    title: 'New Appointment Scheduled',
+    child: 'Lhea Santos',
+    description: 'Guardian Emma Santos scheduled a pediatric checkup with Dra. Maury V. Reyes.',
+    time: '10 minutes ago',
+    icon: CalendarDays,
+    tone: 'blue',
     unread: true,
+  },
+  {
+    id: 102,
+    type: 'Visits',
+    title: 'Appointment Cancelled',
+    child: 'Johny Tan',
+    description: 'Guardian Felicia Tan requested cancellation for the Aug 20 consultation.',
+    time: '40 minutes ago',
+    icon: Edit3,
+    tone: 'rose',
+    unread: true,
+  },
+  {
+    id: 103,
+    type: 'Vaccines',
+    title: 'Vaccine Inventory Alert',
+    child: 'Clinic Supply',
+    description: 'Infanrix Hexa stock has dropped below minimum threshold (12 doses remaining).',
+    time: '2 hours ago',
+    icon: Syringe,
+    tone: 'mint',
+    unread: true,
+  },
+  {
+    id: 104,
+    type: 'Bills',
+    title: 'Payment Confirmed',
+    child: 'Kyla Mae Yap',
+    description: 'Received ₱1,500 consultation payment via GCash. Invoice #KC-INV-204 verified.',
+    time: '3 hours ago',
+    icon: CreditCard,
+    tone: 'gold',
+    unread: true,
+  },
+  {
+    id: 105,
+    type: 'Visits',
+    title: 'Patient Intake Completed',
+    child: 'Sofia Andrade',
+    description: 'Guardian Justine Andrade completed registration and updated clinic records.',
+    time: 'Yesterday',
+    icon: CalendarDays,
+    tone: 'blue',
+    unread: false,
   },
 ]
 
 const NotificationContext = createContext(null)
 
 export function NotificationProvider({ children }) {
-  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS)
+  let isStaff = false
+  try {
+    const auth = useAuth()
+    isStaff = Boolean(auth?.isStaff)
+  } catch (e) {
+    // In case provider used outside AuthContext
+  }
+
+  const [notifications, setNotifications] = useState(() => (isStaff ? STAFF_NOTIFICATIONS : GUARDIAN_NOTIFICATIONS))
   const [isOpen, setIsOpen] = useState(false)
+
+  useEffect(() => {
+    setNotifications(isStaff ? STAFF_NOTIFICATIONS : GUARDIAN_NOTIFICATIONS)
+  }, [isStaff])
+
   const unreadCount = notifications.filter((notification) => notification.unread).length
+
+  const addNotification = (notif) => {
+    setNotifications((prev) => [
+      {
+        id: Date.now(),
+        unread: true,
+        time: 'Just now',
+        icon: notif.icon || (notif.type === 'Visits' ? CalendarDays : notif.type === 'Vaccines' ? Syringe : notif.type === 'Bills' ? CreditCard : Bell),
+        tone: notif.tone || (notif.type === 'Visits' ? 'blue' : notif.type === 'Vaccines' ? 'mint' : 'gold'),
+        ...notif,
+      },
+      ...prev,
+    ])
+  }
+
+  const markAsRead = (id) => {
+    setNotifications((current) => current.map((n) => (n.id === id ? { ...n, unread: false } : n)))
+  }
+
+  const markAllAsRead = () => {
+    setNotifications((current) => current.map((n) => ({ ...n, unread: false })))
+  }
+
+  const removeNotification = (id) => {
+    setNotifications((current) => current.filter((n) => n.id !== id))
+  }
 
   return (
     <NotificationContext.Provider value={{
@@ -84,6 +182,10 @@ export function NotificationProvider({ children }) {
       isOpen,
       setIsOpen,
       unreadCount,
+      addNotification,
+      markAsRead,
+      markAllAsRead,
+      removeNotification,
     }}>
       {children}
     </NotificationContext.Provider>

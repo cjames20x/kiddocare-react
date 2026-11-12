@@ -5,7 +5,9 @@ import {
   ClipboardList, Syringe, FileText, BarChart2, Check
 } from 'lucide-react'
 import AdminSidebar from '../components/AdminSidebar.jsx'
+import NotificationButton from '../components/NotificationButton.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useNotifications } from '../context/NotificationContext.jsx'
 import {
   listAppointments,
   getAppointment,
@@ -855,6 +857,7 @@ function formatTimeDisplay(t) {
 
 function SectionAppointments() {
   const { accessToken } = useAuth();
+  const { addNotification } = useNotifications();
   const token = accessToken || localStorage.getItem('kiddocare-token') || DEMO_ADMIN_TOKEN;
 
   const [rows, setRows] = useState([]);
@@ -1070,11 +1073,21 @@ function SectionAppointments() {
   async function handleStatusUpdate(apptId, newStatus) {
     try {
       const updated = await updateAppointmentStatus(apptId, newStatus, token);
+      const targetRow = rows.find(r => r.id === apptId);
       setRows(prev => prev.map(r => r.id === apptId ? { ...r, status: updated.status || newStatus } : r));
       if (viewA && viewA.id === apptId) {
         setViewA(prev => ({ ...prev, status: updated.status || newStatus }));
       }
       setNotice(`Appointment #${apptId} status updated to ${newStatus}`);
+      if (addNotification) {
+        addNotification({
+          type: 'Visits',
+          title: `Appointment ${newStatus}`,
+          child: targetRow?.patient_name || `Appointment #${apptId}`,
+          description: `Appointment #${apptId} status changed to ${newStatus}.`,
+          tone: newStatus === 'Cancelled' ? 'rose' : newStatus === 'Completed' ? 'mint' : 'blue',
+        });
+      }
     } catch (err) {
       alert(err.message || 'Failed to update appointment status.');
     }
@@ -1121,6 +1134,15 @@ function SectionAppointments() {
       await updateAppointmentStatus(cancelA.id, 'Cancelled', token);
       setRows(prev => prev.map(r => r.id === cancelA.id ? { ...r, status: 'Cancelled' } : r));
       setNotice(`Appointment #${cancelA.id} has been cancelled.`);
+      if (addNotification) {
+        addNotification({
+          type: 'Visits',
+          title: 'Appointment Cancelled',
+          child: cancelA.patient_name || `Patient #${cancelA.patient_id}`,
+          description: `Appointment #${cancelA.id} was marked as Cancelled.`,
+          tone: 'rose',
+        });
+      }
       setCancelA(null);
     } catch (err) {
       alert(err.message || 'Failed to cancel appointment.');
@@ -2467,6 +2489,7 @@ export default function AdminDashboard() {
               <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }}></span>
               Supabase Live Connected
             </span>
+            <NotificationButton />
           </div>
         </div>
 

@@ -138,14 +138,15 @@ export default function NotificationBar() {
 
           <div className="notification-list">
             {visibleNotifications.length > 0 ? visibleNotifications.map((notification) => {
-              const Icon = notification.icon
+              const Icon = notification.icon || Bell
+              const tone = notification.tone || 'blue'
 
               return (
                 <article className={notification.unread ? 'notification-card unread' : 'notification-card'} key={notification.id}>
                   <div className="notification-card-header">
-                    <span className={`notification-type-icon ${notification.tone}`}><Icon size={18} /></span>
+                    <span className={`notification-type-icon ${tone}`}><Icon size={18} /></span>
                     <h3>{notification.title}</h3>
-                    <span className={`notification-child-tag ${notification.tone}`}>{notification.child}</span>
+                    {notification.child && <span className={`notification-child-tag ${tone}`}>{notification.child}</span>}
                   </div>
                   <p>{notification.description}</p>
                   <div className="notification-card-footer">

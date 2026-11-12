@@ -1,13 +1,14 @@
 import { Bell } from 'lucide-react'
 import { useNotifications } from '../context/NotificationContext.jsx'
 
-export default function NotificationButton() {
+export default function NotificationButton({ className = 'dash-bell', style }) {
   const { setIsOpen, unreadCount } = useNotifications()
 
   return (
     <button
       type="button"
-      className="dash-bell"
+      className={className}
+      style={style}
       onClick={() => setIsOpen(true)}
       aria-label={`Open notifications, ${unreadCount} unread`}
       aria-haspopup="dialog"

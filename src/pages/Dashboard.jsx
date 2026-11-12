@@ -6,7 +6,9 @@ import {
   X, AlertTriangle, ShieldCheck,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useNotifications } from '../context/NotificationContext.jsx'
 import DashboardSidebar from '../components/DashboardSidebar.jsx'
+import NotificationButton from '../components/NotificationButton.jsx'
 import {
   listMyPatients,
   registerPatient,
@@ -379,6 +381,7 @@ export default function Dashboard() {
   }, [accessToken])
 
   // Appointments state connected LIVE to Supabase backend
+  const { addNotification } = useNotifications()
   const [appointments, setAppointments] = useState([])
   const [appointmentsLoading, setAppointmentsLoading] = useState(false)
   const [doctors, setDoctors] = useState([])
@@ -614,6 +617,14 @@ export default function Dashboard() {
       }
 
       await createAppointment(payload, accessToken)
+      const targetChild = children.find(c => sameId(c.id, bookForm.childId))
+      addNotification({
+        type: 'Visits',
+        title: 'Appointment Booked',
+        child: targetChild?.name || 'Child',
+        description: `Appointment booked for ${bookForm.date} at ${bookForm.time}. Awaiting clinic confirmation.`,
+        tone: 'blue',
+      })
       alert('Appointment successfully booked! It is now pending clinic confirmation.')
       await loadAppointments()
       setActiveTab('Appointments')
@@ -741,10 +752,7 @@ export default function Dashboard() {
               <ShieldCheck size={16} color={userMfaEnabled ? '#059669' : '#64748b'} />
               {userMfaEnabled ? 'MFA: Enabled' : 'MFA: Disabled'}
             </button>
-            <div className="dash-bell">
-              <Bell size={20} />
-              <span className="dash-bell-dot"></span>
-            </div>
+            <NotificationButton />
           </div>
         </div>
 
@@ -1280,26 +1288,37 @@ export default function Dashboard() {
                       </td>
                     </tr>
                   ) : (
-                    appointments.map((a) => (
-                      <tr key={a.id}>
-                        <td><strong>{children.find((c) => sameId(c.id, a.childId))?.name || a.childName}</strong></td>
-                        <td>{formatServiceName(a.service)}</td>
-                        <td>{a.date}</td>
-                        <td>{a.time}</td>
-                        <td>
-                          <span style={{
-                            padding: '4px 10px',
-                            borderRadius: '12px',
-                            background: '#e0f2fe',
-                            color: '#0369a1',
-                            fontWeight: 700,
-                            fontSize: '12px'
-                          }}>
-                            {a.status || 'Confirmed'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
+                    appointments.map((a) => {
+                      const st = String(a.status || 'Confirmed').toLowerCase();
+                      let badgeStyle = {
+                        padding: '4px 10px',
+                        borderRadius: '12px',
+                        fontWeight: 700,
+                        fontSize: '12px',
+                        background: '#fef3c7',
+                        color: '#b45309',
+                      };
+                      if (st === 'confirmed') {
+                        badgeStyle = { padding: '4px 10px', borderRadius: '12px', fontWeight: 700, fontSize: '12px', background: '#e0f2fe', color: '#0369a1' };
+                      } else if (st === 'completed') {
+                        badgeStyle = { padding: '4px 10px', borderRadius: '12px', fontWeight: 700, fontSize: '12px', background: '#dcfce7', color: '#15803d' };
+                      } else if (st === 'cancelled') {
+                        badgeStyle = { padding: '4px 10px', borderRadius: '12px', fontWeight: 700, fontSize: '12px', background: '#fee2e2', color: '#b91c1c' };
+                      }
+                      return (
+                        <tr key={a.id}>
+                          <td><strong>{children.find((c) => sameId(c.id, a.childId))?.name || a.childName}</strong></td>
+                          <td>{formatServiceName(a.service)}</td>
+                          <td>{a.date}</td>
+                          <td>{a.time}</td>
+                          <td>
+                            <span style={badgeStyle}>
+                              {a.status || 'Confirmed'}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
