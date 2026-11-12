@@ -138,15 +138,24 @@ export const recordPayment = (id, payload, token) =>
 export const listVaccines = (token) => request('/api/vaccinations/vaccines', { token })
 export const listUpcomingVaccinations = (token, withinDays = 30) =>
   request(`/api/vaccinations/due?within_days=${withinDays}`, { token })
+export const listVaccinations = (token) => request('/api/vaccinations', { token })
 export const listVaccinationsByPatient = (patientId, token) =>
   request(`/api/vaccinations/patient/${patientId}`, { token })
 export const createVaccination = (payload, token) =>
   request('/api/vaccinations', { method: 'POST', body: payload, token })
 
 // ---- Medical Records ----
+export const listMedicalRecords = (token) => request('/api/medical-records', { token })
 export const listMedicalRecordsByPatient = (patientId, token) =>
   request(`/api/medical-records/patient/${patientId}`, { token })
 export const createMedicalRecord = (payload, token) =>
   request('/api/medical-records', { method: 'POST', body: payload, token })
+
+// ---- Prescriptions ----
+export const listPrescriptions = (token) => request('/api/prescriptions', { token })
+export const listPrescriptionsByPatient = (patientId, token) =>
+  request(`/api/prescriptions/patient/${patientId}`, { token })
+export const createPrescription = (payload, token) =>
+  request('/api/prescriptions', { method: 'POST', body: payload, token })
 
 export { ApiError, API_BASE }

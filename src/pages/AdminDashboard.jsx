@@ -22,6 +22,12 @@ import {
   listPayments,
   listVaccines,
   listUpcomingVaccinations,
+  listVaccinations,
+  createVaccination,
+  listMedicalRecords,
+  createMedicalRecord,
+  listPrescriptions,
+  createPrescription,
   setupMfa,
   confirmMfa,
   disableMfa,
@@ -80,8 +86,17 @@ const INIT_PRESCRIPTIONS = [
 ]
 
 function fmt(d) {
-  if (!d) return '—'
-  const dt = new Date(d + 'T00:00:00')
+  if (!d || d === '—' || d === 'N/A' || d === 'null' || d === 'undefined') return '—'
+  const clean = String(d).split('T')[0].trim()
+  if (!clean || clean === '—' || clean === 'N/A') return '—'
+  const dt = new Date(clean + 'T00:00:00')
+  if (isNaN(dt.getTime())) {
+    const direct = new Date(d)
+    if (!isNaN(direct.getTime())) {
+      return direct.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })
+    }
+    return '—'
+  }
   return dt.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })
 }
 
@@ -232,14 +247,18 @@ function SectionDashboard({ patients, onNavigate }) {
         ])
         if (Array.isArray(appts)) setLiveApptCount(appts.length)
         if (Array.isArray(pats) && pats.length > 0) {
-          setRows(pats.map(p => ({
-            id: `KC-${String(p.id).padStart(3, '0')}`,
-            name: p.patient_name,
-            age: p.date_of_birth || 'N/A',
-            gender: p.gender ? p.gender[0].toUpperCase() + p.gender.slice(1) : 'Male',
-            nextVisit: '—',
-            guardian: 'Registered Guardian',
-          })))
+          setRows(pats.map(p => {
+            const pAppts = Array.isArray(appts) ? appts.filter(a => a.patient_id === p.id && a.status !== 'Cancelled') : []
+            const upcoming = pAppts.sort((a,b) => new Date(a.appointment_date) - new Date(b.appointment_date))[0]
+            return {
+              id: `KC-${String(p.id).padStart(3, '0')}`,
+              name: p.patient_name,
+              age: p.date_of_birth || 'N/A',
+              gender: p.gender ? p.gender[0].toUpperCase() + p.gender.slice(1) : 'Male',
+              nextVisit: upcoming ? upcoming.appointment_date : '—',
+              guardian: p.guardian_name || p.guardian || 'Guardian',
+            }
+          }))
         }
       } catch (e) {}
     }
@@ -506,18 +525,25 @@ function SectionPatientMgmt() {
   async function loadLivePatients() {
     try {
       setLoading(true);
-      const pats = await listMyPatients(token);
+      const [pats, appts] = await Promise.all([
+        listMyPatients(token).catch(() => []),
+        listAppointments(token).catch(() => []),
+      ]);
       if (Array.isArray(pats)) {
         setRows(
-          pats.map((p) => ({
-            id: `KC-${String(p.id).padStart(3, '0')}`,
-            rawId: p.id,
-            name: p.patient_name,
-            age: p.date_of_birth || 'N/A',
-            gender: p.gender ? p.gender.charAt(0).toUpperCase() + p.gender.slice(1) : 'Male',
-            nextVisit: p.registration_date ? String(p.registration_date).slice(0, 10) : '—',
-            guardian: 'Registered Guardian',
-          }))
+          pats.map((p) => {
+            const pAppts = Array.isArray(appts) ? appts.filter(a => a.patient_id === p.id && a.status !== 'Cancelled') : [];
+            const upcoming = pAppts.sort((a,b) => new Date(a.appointment_date) - new Date(b.appointment_date))[0];
+            return {
+              id: `KC-${String(p.id).padStart(3, '0')}`,
+              rawId: p.id,
+              name: p.patient_name,
+              age: p.date_of_birth || 'N/A',
+              gender: p.gender ? p.gender.charAt(0).toUpperCase() + p.gender.slice(1) : 'Male',
+              nextVisit: upcoming ? upcoming.appointment_date : (p.registration_date ? String(p.registration_date).slice(0, 10) : '—'),
+              guardian: p.guardian_name || p.guardian || 'Guardian',
+            };
+          })
         );
       }
     } catch (e) {
@@ -648,17 +674,73 @@ function SectionPatientMgmt() {
 }
 
 function SectionMedicalRecords() {
+  const { accessToken } = useAuth();
+  const token = accessToken || localStorage.getItem('kiddocare-token') || DEMO_ADMIN_TOKEN;
   const [rows, setRows]     = useState(INIT_RECORDS)
+  const [patients, setPatients] = useState([])
   const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const [viewR,   setViewR]   = useState(null)
   const [deleteR, setDeleteR] = useState(null)
-  const [addF, setAddF]= useState({ patient:'', date:'', diagnosis:'', doctor:'' })
+  const [addF, setAddF]= useState({ patient_id:'', symptoms:'', diagnosis:'', doctor:'Dra. Maury V. Reyes' })
 
-  const filtered = rows.filter(r=>r.patient.toLowerCase().includes(search.toLowerCase())||r.diagnosis.toLowerCase().includes(search.toLowerCase()))
+  async function loadRecords() {
+    try {
+      const [records, pats] = await Promise.all([
+        listMedicalRecords(token).catch(() => []),
+        listMyPatients(token).catch(() => []),
+      ]);
+      if (Array.isArray(pats)) setPatients(pats);
+      if (Array.isArray(records) && records.length > 0) {
+        setRows(records.map((r, i) => ({
+          id: `MR-${String(r.id || i + 1).padStart(3, '0')}`,
+          rawId: r.id,
+          patient: r.patient_name || `Patient #${r.patient_id}`,
+          patient_id: r.patient_id,
+          date: r.created_at ? String(r.created_at).slice(0, 10) : '2026-11-12',
+          diagnosis: r.diagnosis || 'General Consultation',
+          symptoms: r.symptoms || '',
+          doctor: 'Pediatric Specialist',
+        })));
+      }
+    } catch (e) {
+      console.warn('Could not load medical records:', e);
+    }
+  }
 
-  function doAdd(e) { e.preventDefault(); setRows([...rows,{id:`MR-${String(rows.length+1).padStart(3,'0')}`, ...addF}]); setAddF({patient:'',date:'',diagnosis:'',doctor:''}); setShowAdd(false) }
-  function doDelete() { setRows(rows.filter(r=>r.id!==deleteR.id)); setDeleteR(null) }
+  useEffect(() => {
+    loadRecords();
+  }, [token]);
+
+  const filtered = rows.filter(r=>
+    (r.patient || '').toLowerCase().includes(search.toLowerCase())||
+    (r.diagnosis || '').toLowerCase().includes(search.toLowerCase())
+  );
+
+  async function doAdd(e) {
+    e.preventDefault();
+    if (!addF.patient_id || !addF.diagnosis) {
+      alert('Please select a patient and enter a diagnosis.');
+      return;
+    }
+    try {
+      await createMedicalRecord({
+        patient_id: Number(addF.patient_id),
+        diagnosis: addF.diagnosis.trim(),
+        symptoms: addF.symptoms ? addF.symptoms.trim() : 'Routine pediatric checkup',
+      }, token);
+      await loadRecords();
+      setAddF({ patient_id:'', symptoms:'', diagnosis:'', doctor:'Dra. Maury V. Reyes' });
+      setShowAdd(false);
+    } catch (err) {
+      alert(err.message || 'Could not save medical record');
+    }
+  }
+
+  function doDelete() {
+    setRows(rows.filter(r=>r.id!==deleteR.id));
+    setDeleteR(null);
+  }
 
   return (
     <>
@@ -677,15 +759,30 @@ function SectionMedicalRecords() {
                   </div></td>
                 </tr>
               ))}
+              {!filtered.length && <tr><td colSpan={6} style={{textAlign:'center',color:'#9ca3af',padding:24}}>No records found.</td></tr>}
             </tbody>
           </table>
         </div>
       </div>
       {showAdd && <Overlay onClose={()=>setShowAdd(false)}><ModalHdr title="Add Medical Record" onClose={()=>setShowAdd(false)}/>
         <div className="adm-modal-body"><form onSubmit={doAdd}>
-          <Field label="Patient Name:"><Inp value={addF.patient} placeholder="Patient name" onChange={e=>setAddF({...addF,patient:e.target.value})}/></Field>
-          <Field label="Date:"><Inp type="date" value={addF.date} onChange={e=>setAddF({...addF,date:e.target.value})}/></Field>
-          <Field label="Diagnosis:"><Inp value={addF.diagnosis} placeholder="Diagnosis" onChange={e=>setAddF({...addF,diagnosis:e.target.value})}/></Field>
+          <Field label="Select Patient: *">
+            <select
+              className="adm-inp"
+              value={addF.patient_id}
+              onChange={e=>setAddF({...addF, patient_id: e.target.value})}
+              required
+            >
+              <option value="">-- Choose child/patient --</option>
+              {patients.map(p => (
+                <option key={p.id} value={p.id}>
+                  {p.patient_name} (ID: {p.id})
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Diagnosis: *"><Inp value={addF.diagnosis} placeholder="e.g. Acute Pharyngitis" onChange={e=>setAddF({...addF,diagnosis:e.target.value})}/></Field>
+          <Field label="Symptoms:"><Inp value={addF.symptoms} placeholder="e.g. Mild fever, dry cough" onChange={e=>setAddF({...addF,symptoms:e.target.value})}/></Field>
           <Field label="Doctor:"><Inp value={addF.doctor} placeholder="Attending doctor" onChange={e=>setAddF({...addF,doctor:e.target.value})}/></Field>
           <SubmitBtn label="Add Record"/>
         </form></div>
@@ -696,6 +793,7 @@ function SectionMedicalRecords() {
           <Field label="Patient:"><RO val={viewR.patient}/></Field>
           <Field label="Date:"><RO val={fmt(viewR.date)}/></Field>
           <Field label="Diagnosis:"><RO val={viewR.diagnosis}/></Field>
+          <Field label="Symptoms:"><RO val={viewR.symptoms || 'None recorded'}/></Field>
           <Field label="Doctor:"><RO val={viewR.doctor}/></Field>
         </div>
       </Overlay>}
@@ -1735,33 +1833,65 @@ function SectionVaccinations() {
   const { accessToken } = useAuth();
   const token = accessToken || localStorage.getItem('kiddocare-token') || DEMO_ADMIN_TOKEN;
   const [rows, setRows]     = useState(INIT_VACC);
+  const [patients, setPatients] = useState([]);
   const [search, setSearch] = useState('');
+  const [showAdd, setShowAdd] = useState(false);
+  const [deleteV, setDeleteV] = useState(null);
+  const [addF, setAddF] = useState({ patient_id:'', vaccine_name:'', date:'', status:'Completed' });
+
+  async function loadVax() {
+    try {
+      const [vaxList, pats] = await Promise.all([
+        listVaccinations(token).catch(() => []),
+        listMyPatients(token).catch(() => []),
+      ]);
+      if (Array.isArray(pats)) setPatients(pats);
+      if (Array.isArray(vaxList) && vaxList.length > 0) {
+        setRows(vaxList.map((v, i) => ({
+          id: `V-${String(v.id || i + 1).padStart(3, '0')}`,
+          rawId: v.id,
+          patient: v.patient_name || `Patient #${v.patient_id}`,
+          vaccine: v.vaccine_name || 'Pediatric Vaccine',
+          date: v.date_administered || v.next_due_date || '—',
+          status: v.date_administered ? 'Completed' : 'Pending',
+        })));
+      }
+    } catch (e) {
+      console.warn('Could not load vaccinations:', e);
+    }
+  }
 
   useEffect(() => {
-    async function loadVax() {
-      try {
-        const due = await listUpcomingVaccinations(token, 180).catch(() => []);
-        if (Array.isArray(due) && due.length > 0) {
-          setRows(due.map((v, i) => ({
-            id: `V-${String(v.id || i + 1).padStart(3, '0')}`,
-            patient: v.patient_name || `Patient #${v.patient_id}`,
-            vaccine: v.vaccine_name || 'Booster Vaccine',
-            date: v.due_date || v.date_administered || '2026-11-20',
-            status: v.status || (v.date_administered ? 'Completed' : 'Pending'),
-          })));
-        }
-      } catch (e) {}
-    }
     loadVax();
-  }, [token])
-  const [showAdd, setShowAdd] = useState(false)
-  const [deleteV, setDeleteV] = useState(null)
-  const [addF, setAddF] = useState({ patient:'', vaccine:'', date:'', status:'Pending' })
+  }, [token]);
 
-  const filtered = rows.filter(r=>r.patient.toLowerCase().includes(search.toLowerCase())||r.vaccine.toLowerCase().includes(search.toLowerCase()))
-  function doAdd(e) { e.preventDefault(); setRows([...rows,{id:`V-${String(rows.length+1).padStart(3,'0')}`, ...addF}]); setAddF({patient:'',vaccine:'',date:'',status:'Pending'}); setShowAdd(false) }
-  function doDelete() { setRows(rows.filter(r=>r.id!==deleteV.id)); setDeleteV(null) }
-  function markDone(id) { setRows(rows.map(r=>r.id===id?{...r,status:'Completed'}:r)) }
+  const filtered = rows.filter(r=>
+    (r.patient || '').toLowerCase().includes(search.toLowerCase())||
+    (r.vaccine || '').toLowerCase().includes(search.toLowerCase())
+  );
+
+  async function doAdd(e) {
+    e.preventDefault();
+    if (!addF.patient_id || !addF.vaccine_name) {
+      alert('Please select a patient and vaccine name.');
+      return;
+    }
+    try {
+      await createVaccination({
+        patient_id: Number(addF.patient_id),
+        vaccine_name: addF.vaccine_name.trim(),
+        date_administered: addF.date || new Date().toISOString().slice(0, 10),
+      }, token);
+      await loadVax();
+      setAddF({ patient_id:'', vaccine_name:'', date:'', status:'Completed' });
+      setShowAdd(false);
+    } catch (err) {
+      alert(err.message || 'Could not record vaccination');
+    }
+  }
+
+  function doDelete() { setRows(rows.filter(r=>r.id!==deleteV.id)); setDeleteV(null); }
+  function markDone(id) { setRows(rows.map(r=>r.id===id?{...r,status:'Completed'}:r)); }
 
   return (
     <>
@@ -1781,20 +1911,37 @@ function SectionVaccinations() {
                   </div></td>
                 </tr>
               ))}
+              {!filtered.length && <tr><td colSpan={6} style={{textAlign:'center',color:'#9ca3af',padding:24}}>No vaccinations found.</td></tr>}
             </tbody>
           </table>
         </div>
       </div>
       {showAdd && <Overlay onClose={()=>setShowAdd(false)}><ModalHdr title="Add Vaccination" onClose={()=>setShowAdd(false)}/>
         <div className="adm-modal-body"><form onSubmit={doAdd}>
-          <Field label="Patient Name:"><Inp value={addF.patient} placeholder="Patient" onChange={e=>setAddF({...addF,patient:e.target.value})}/></Field>
-          <Field label="Vaccine:"><Inp value={addF.vaccine} placeholder="Vaccine name" onChange={e=>setAddF({...addF,vaccine:e.target.value})}/></Field>
-          <Field label="Date:"><Inp type="date" value={addF.date} onChange={e=>setAddF({...addF,date:e.target.value})}/></Field>
-          <Field label="Status:">
-            <select className="adm-inp" value={addF.status} onChange={e=>setAddF({...addF,status:e.target.value})}>
-              <option>Pending</option><option>Completed</option>
+          <Field label="Select Patient: *">
+            <select
+              className="adm-inp"
+              value={addF.patient_id}
+              onChange={e=>setAddF({...addF, patient_id: e.target.value})}
+              required
+            >
+              <option value="">-- Choose child/patient --</option>
+              {patients.map(p => (
+                <option key={p.id} value={p.id}>
+                  {p.patient_name} (ID: {p.id})
+                </option>
+              ))}
             </select>
           </Field>
+          <Field label="Vaccine Name: *">
+            <Inp
+              value={addF.vaccine_name}
+              placeholder="e.g. MMR, BCG, Polio (OPV), Hepatitis B"
+              onChange={e=>setAddF({...addF,vaccine_name:e.target.value})}
+            />
+          </Field>
+          <Field label="Date Administered:">
+            <Inp type="date" value={addF.date} onChange={e=>setAddF({...addF,date:e.target.value})}/></Field>
           <SubmitBtn label="Add Vaccination"/>
         </form></div>
       </Overlay>}
@@ -1886,16 +2033,74 @@ function SectionPayments() {
 }
 
 function SectionPrescriptions() {
-  const [rows, setRows]     = useState(INIT_PRESCRIPTIONS)
-  const [search, setSearch] = useState('')
-  const [showAdd, setShowAdd] = useState(false)
-  const [viewRx,  setViewRx]  = useState(null)
-  const [deleteRx, setDeleteRx]= useState(null)
-  const [addF, setAddF] = useState({ patient:'', medication:'', dosage:'', doctor:'', date:'' })
+  const { accessToken } = useAuth();
+  const token = accessToken || localStorage.getItem('kiddocare-token') || DEMO_ADMIN_TOKEN;
+  const [rows, setRows]     = useState(INIT_PRESCRIPTIONS);
+  const [patients, setPatients] = useState([]);
+  const [search, setSearch] = useState('');
+  const [showAdd, setShowAdd] = useState(false);
+  const [viewRx,  setViewRx]  = useState(null);
+  const [deleteRx, setDeleteRx]= useState(null);
+  const [addF, setAddF] = useState({ patient_id:'', medication:'', dosage:'', frequency:'', duration:'', doctor:'Dra. Maury V. Reyes' });
 
-  const filtered = rows.filter(r=>r.patient.toLowerCase().includes(search.toLowerCase())||r.medication.toLowerCase().includes(search.toLowerCase()))
-  function doAdd(e) { e.preventDefault(); setRows([...rows,{id:`RX-${String(rows.length+1).padStart(3,'0')}`, ...addF}]); setAddF({patient:'',medication:'',dosage:'',doctor:'',date:''}); setShowAdd(false) }
-  function doDelete() { setRows(rows.filter(r=>r.id!==deleteRx.id)); setDeleteRx(null) }
+  async function loadPrescriptions() {
+    try {
+      const [rxList, pats] = await Promise.all([
+        listPrescriptions(token).catch(() => []),
+        listMyPatients(token).catch(() => []),
+      ]);
+      if (Array.isArray(pats)) setPatients(pats);
+      if (Array.isArray(rxList) && rxList.length > 0) {
+        setRows(rxList.map((r, i) => ({
+          id: `RX-${String(r.id || i + 1).padStart(3, '0')}`,
+          rawId: r.id,
+          patient: r.patient_name || `Patient #${r.patient_id}`,
+          patient_id: r.patient_id,
+          medication: r.medication_name,
+          dosage: r.dosage,
+          frequency: r.medication_frequency,
+          duration: r.medication_duration,
+          doctor: 'Dra. Maury V. Reyes',
+          date: '2026-11-12',
+        })));
+      }
+    } catch (e) {
+      console.warn('Could not load prescriptions:', e);
+    }
+  }
+
+  useEffect(() => {
+    loadPrescriptions();
+  }, [token]);
+
+  const filtered = rows.filter(r=>
+    (r.patient || '').toLowerCase().includes(search.toLowerCase())||
+    (r.medication || '').toLowerCase().includes(search.toLowerCase())
+  );
+
+  async function doAdd(e) {
+    e.preventDefault();
+    if (!addF.patient_id || !addF.medication || !addF.dosage) {
+      alert('Please select a patient, medication name, and dosage.');
+      return;
+    }
+    try {
+      await createPrescription({
+        patient_id: Number(addF.patient_id),
+        medication_name: addF.medication.trim(),
+        dosage: addF.dosage.trim(),
+        medication_frequency: addF.frequency || '3x daily',
+        medication_duration: addF.duration || '7 days',
+      }, token);
+      await loadPrescriptions();
+      setAddF({ patient_id:'', medication:'', dosage:'', frequency:'', duration:'', doctor:'Dra. Maury V. Reyes' });
+      setShowAdd(false);
+    } catch (err) {
+      alert(err.message || 'Could not record prescription');
+    }
+  }
+
+  function doDelete() { setRows(rows.filter(r=>r.id!==deleteRx.id)); setDeleteRx(null); }
 
   return (
     <>
@@ -1915,17 +2120,33 @@ function SectionPrescriptions() {
                   </div></td>
                 </tr>
               ))}
+              {!filtered.length && <tr><td colSpan={7} style={{textAlign:'center',color:'#9ca3af',padding:24}}>No prescriptions found.</td></tr>}
             </tbody>
           </table>
         </div>
       </div>
       {showAdd && <Overlay onClose={()=>setShowAdd(false)}><ModalHdr title="New Prescription" onClose={()=>setShowAdd(false)}/>
         <div className="adm-modal-body"><form onSubmit={doAdd}>
-          <Field label="Patient Name:"><Inp value={addF.patient} placeholder="Patient" onChange={e=>setAddF({...addF,patient:e.target.value})}/></Field>
-          <Field label="Medication:"><Inp value={addF.medication} placeholder="Drug name & dosage" onChange={e=>setAddF({...addF,medication:e.target.value})}/></Field>
-          <Field label="Instructions:"><Inp value={addF.dosage} placeholder="e.g. 3x daily for 7 days" onChange={e=>setAddF({...addF,dosage:e.target.value})}/></Field>
+          <Field label="Select Patient: *">
+            <select
+              className="adm-inp"
+              value={addF.patient_id}
+              onChange={e=>setAddF({...addF, patient_id: e.target.value})}
+              required
+            >
+              <option value="">-- Choose child/patient --</option>
+              {patients.map(p => (
+                <option key={p.id} value={p.id}>
+                  {p.patient_name} (ID: {p.id})
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Medication Name: *"><Inp value={addF.medication} placeholder="e.g. Amoxicillin, Paracetamol" onChange={e=>setAddF({...addF,medication:e.target.value})}/></Field>
+          <Field label="Dosage: *"><Inp value={addF.dosage} placeholder="e.g. 250mg / 5ml" onChange={e=>setAddF({...addF,dosage:e.target.value})}/></Field>
+          <Field label="Frequency:"><Inp value={addF.frequency} placeholder="e.g. 3x daily after meals" onChange={e=>setAddF({...addF,frequency:e.target.value})}/></Field>
+          <Field label="Duration:"><Inp value={addF.duration} placeholder="e.g. 7 days" onChange={e=>setAddF({...addF,duration:e.target.value})}/></Field>
           <Field label="Doctor:"><Inp value={addF.doctor} placeholder="Prescribing doctor" onChange={e=>setAddF({...addF,doctor:e.target.value})}/></Field>
-          <Field label="Date:"><Inp type="date" value={addF.date} onChange={e=>setAddF({...addF,date:e.target.value})}/></Field>
           <SubmitBtn label="Add Prescription"/>
         </form></div>
       </Overlay>}
@@ -1935,6 +2156,8 @@ function SectionPrescriptions() {
           <Field label="Patient:"><RO val={viewRx.patient}/></Field>
           <Field label="Medication:"><RO val={viewRx.medication}/></Field>
           <Field label="Instructions:"><RO val={viewRx.dosage}/></Field>
+          <Field label="Frequency:"><RO val={viewRx.frequency || 'Once daily'}/></Field>
+          <Field label="Duration:"><RO val={viewRx.duration || '7 days'}/></Field>
           <Field label="Doctor:"><RO val={viewRx.doctor}/></Field>
           <Field label="Date:"><RO val={fmt(viewRx.date)}/></Field>
         </div>
