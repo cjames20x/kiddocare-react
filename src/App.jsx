@@ -14,6 +14,8 @@ import AdminLogin from './pages/AdminLogin.jsx'
 import AdminDashboard from './pages/AdminDashboard.jsx'
 import ProtectedRoute, { STAFF_ROLES } from './components/ProtectedRoute.jsx'
 import NotificationBar from './components/NotificationBar.jsx'
+import PrivacyPolicy from './pages/PrivacyPolicy.jsx'
+import TermsAndConditions from './pages/TermsAndConditions.jsx'
 
 export default function App() {
   return (
@@ -40,6 +42,9 @@ export default function App() {
           path="/admin-dashboard"
           element={<ProtectedRoute roles={STAFF_ROLES}><AdminDashboard /></ProtectedRoute>}
         />
+
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/terms" element={<TermsAndConditions />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
